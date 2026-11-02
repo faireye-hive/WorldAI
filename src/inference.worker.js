@@ -7,7 +7,16 @@ async function load(backend){
  if(loadPromise)return loadPromise;
  currentBackend=backend;
  loadPromise=(async()=>{
-  const {pipeline}=await import('@huggingface/transformers');
+  const {pipeline,env}=await import('@huggingface/transformers');
+  // Browser Cache Storage persists ONNX downloads between visits when allowed.
+  env.useBrowserCache=true;
+  // GitHub Pages serves models from the deployment artifact, NOT Git LFS.
+  // Vite's dev server still uses Hugging Face for local development.
+  if(import.meta.env.PROD){
+   env.allowLocalModels=true;
+   env.allowRemoteModels=false;
+   env.localModelPath=new URL(`${import.meta.env.BASE_URL}models/v1/`,self.location.origin).href;
+  }
   generator=await pipeline('text-generation',MODEL,{
    device:backend==='webgpu'?'webgpu':'wasm',
    dtype:backend==='webgpu'?'q4f16':'q8',
