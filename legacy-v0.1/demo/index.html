@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WorldAI — Living World Simulator</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-symbol">◈</div><div><strong>WORLD<span>AI</span></strong><small>SIMULATION ENGINE · v0.1</small></div></div>
+      <div class="tiny-caption">PAINEL DE CONTROLE</div>
+      <div class="section">
+        <div class="field-row"><span>Status da simulação</span><span class="online"><i></i> Online</span></div>
+        <div class="controls"><button id="pause" class="primary">Ⅱ Pausar</button><button id="reset" title="Reiniciar mundo">↻ Reset</button></div>
+        <label class="field-label" for="speed">Velocidade <strong id="speedDisplay">1×</strong></label>
+        <input type="range" id="speed" min="0.25" max="4" step="0.25" value="1" />
+        <div class="mini-info">As decisões de IA são eventuais, não a cada frame.</div>
+      </div>
+      <div class="tiny-caption">AGENTES</div>
+      <div class="section compact">
+        <div class="agent-filter"><button class="selected" data-filter="all">Todos</button><button data-filter="npc">NPCs</button><button data-filter="monster">Monstros</button><button data-filter="animal">Animais</button></div>
+        <div id="actorList" class="actor-list"></div>
+      </div>
+      <div class="sidebar-bottom">
+        <div class="tiny-caption">CRIAR PERSONAGEM</div>
+        <div class="controls" style="margin-top:10px"><button id="addNpc">+ NPC</button><button id="addWolf">+ Lobo</button><button id="addDeer">+ Cervo</button></div>
+      </div>
+    </aside>
+    <main class="content">
+      <header class="topbar">
+        <div><div class="breadcrumbs">PROJETOS <span>/</span> SANDBOX <span>/</span> <b>ECOSSISTEMA</b></div><h1>Living World <em>Simulator</em></h1><p>Um mundo onde personagens pensam, lembram e reagem.</p></div>
+        <div class="top-actions"><span class="build">● MOTOR LOCAL</span><button id="save" class="save-button">↓ Exportar mundo</button><button id="load">↑ Importar</button><input id="file" type="file" accept="application/json,.json" hidden /></div>
+      </header>
+      <div class="stats">
+        <div class="stat"><div>HABITANTES</div><strong id="agentsCount">10</strong><span>entidades ativas</span></div>
+        <div class="stat"><div>DECISÕES</div><strong id="decisionsCount">0</strong><span>desde o início</span></div>
+        <div class="stat"><div>HORA DO MUNDO</div><strong id="timeDisplay">07:00</strong><span id="dayState">Manhã</span></div>
+        <div class="stat"><div>IA EXTERNA</div><strong id="aiStatus">OFF</strong><span id="aiSubtitle">Comportamento local</span></div>
+      </div>
+      <div class="workspace">
+        <section class="map-card">
+          <div class="card-head"><div><span class="eyebrow">VISUALIZAÇÃO EM TEMPO REAL</span><h2>Mapa do ecossistema <small>980 × 620</small></h2></div><div class="legend"><span><i class="dot villagers"></i> Habitantes</span><span><i class="dot monsters"></i> Monstros</span><span><i class="dot animals"></i> Animais</span></div></div>
+          <div class="map-wrapper"><canvas id="map" width="980" height="620" aria-label="Mapa interativo de agentes"></canvas><span class="map-info">▧ Clique em uma criatura para inspecionar · Clique no chão para posicionar o jogador</span></div>
+          <div class="map-footer"><span>◉ Caminhos com A* · Memória persistente · Utility AI</span><button id="noise">◌ Emitir ruído no jogador</button></div>
+        </section>
+        <div class="right-column">
+          <section class="inspector card">
+            <div class="card-head"><div><span class="eyebrow">TELEMETRIA DE AGENTE</span><h2>Inspetor</h2></div><span id="inspectorBadge" class="badge">NPC</span></div>
+            <div id="inspector"></div>
+          </section>
+          <section class="ai-card card">
+            <div class="card-head"><div><span class="eyebrow">EXPERIMENTAL · OPCIONAL</span><h2>Modelo local</h2></div><label class="toggle"><input type="checkbox" id="aiToggle" /><span></span></label></div>
+            <p>Conecte o Ollama para selecionar ações. Sem modelo, a simulação usa IA tradicional.</p>
+            <div class="form-row"><label>Modelo</label><input id="model" value="lfm3" placeholder="lfm3" autocomplete="off" /></div>
+            <p class="micro">Servidor de demonstração encaminha pedidos para o Ollama local (porta 11435 por padrão). Máximo: 1 pedido concorrente.</p>
+          </section>
+        </div>
+      </div>
+      <section class="events card"><div class="card-head"><div><span class="eyebrow">ATIVIDADE DO MUNDO</span><h2>Eventos em tempo real</h2></div><button id="clearLog" class="ghost">Limpar histórico</button></div><div id="log" class="log"></div></section>
+      <div class="dialogue-backdrop" id="dialogueModal" hidden>
+        <div class="dialogue-box" role="dialog" aria-modal="true" aria-labelledby="dialogueName">
+          <div class="dialogue-top"><div><span class="eyebrow">CONVERSA COM PERSONAGEM</span><h2 id="dialogueName">Marcus</h2></div><button id="dialogueClose" aria-label="Fechar conversa">✕</button></div>
+          <div class="dialogue-messages" id="dialogueMessages"></div>
+          <form class="dialogue-form" id="dialogueForm"><input id="dialogueInput" maxlength="240" required placeholder="Pergunte algo ao personagem..." autocomplete="off" /><button>Enviar ↗</button></form>
+          <div class="dialogue-hint">Com IA desligada, diálogos são gerados por regras locais. Com IA ligada, o Ollama gera respostas.</div>
+        </div>
+      </div>
+      <footer>WORLD<span>AI</span> <b>ENGINE</b> · JavaScript ES Modules · Sem dependências · Preparado para integração Three.js</footer>
+    </main>
+  </div>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

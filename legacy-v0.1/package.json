@@ -1,0 +1,16 @@
+{
+  "name": "worldai",
+  "version": "0.1.0",
+  "description": "Engine de autonomia para NPCs e monstros, desacoplada da renderização.",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.js",
+    "./ollama": "./src/adapters/ollama.js"
+  },
+  "scripts": {
+    "demo": "node ./scripts/dev-server.mjs",
+    "test": "node --test ./tests/*.test.mjs"
+  },
+  "engines": { "node": ">=20" }
+}
