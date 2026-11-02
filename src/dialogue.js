@@ -43,6 +43,11 @@ export function buildNPCMessages(data, retry = false) {
     "Respond to what the player said; do not repeat or quote their question.",
     "Never invent items, rewards, money, completed quests or changes to game state.",
     "Time: " + time + ".",
+    "Character background: " + short(data.description, 260) + ".",
+    "World facts: Vila Aurora contains " + (Array.isArray(data.knownPlaces) ? data.knownPlaces.map(p=>p.name).slice(0,8).join(", ") : "a small village") + ".",
+    "Allowed interactions: " + (Array.isArray(data.allowedActions) ? data.allowedActions.join(", ") : "none") + ".",
+    "Real available stock: " + (Array.isArray(data.inventory) ? JSON.stringify(data.inventory).slice(0,220) : "none") + ".",
+    "Only the game engine can move, trade, give items or change money; never claim an action completed unless confirmed.",
     memories.length ? "Known events: " + memories.join("; ") + "." : "",
     retry ? "IMPORTANT: Do not echo the player. Add a relevant new fact from your profession or the village." : ""
   ].filter(Boolean).join(" ");
