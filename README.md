@@ -1,67 +1,74 @@
-# WorldAI — Living Stories (v0.2)
+# WorldAI — Living Stories v0.3 (Ollama local)
 
-Protótipo de RPG 2D com **cinco habitantes conversáveis**, **cinco criaturas autônomas**, memória por personagem e **IA real no navegador via Transformers.js** (opcional). Criado como laboratório para futura integração com Tales of Pirates / Three.js.
+Laboratório de NPCs para futura integração com **Tales of Pirates / Three.js**. Inclui vila 2D, **cinco habitantes com conversas**, cinco criaturas com decisões por regras, relações, memória e salvamento. O chat agora usa o **Ollama + Qwen3.5:0.8B**, executado no **seu próprio computador**. Não é necessário baixar modelos no navegador, nem configurar CORS.
 
-## Executar
+## Testar localmente — Linux
+
+Pré-requisitos: Node.js >=20, Ollama em execução em `127.0.0.1:11434` e o modelo `qwen3.5:0.8b` instalado.
 
 ```bash
+# Verificar instalação local
+ollama list
+curl http://127.0.0.1:11434/api/tags
+
+# Se ainda não possuir o modelo:
+ollama pull qwen3.5:0.8b
+
+# Primeira vez:
+git clone https://github.com/faireye-hive/WorldAI.git
+cd WorldAI
 npm install
 npm run dev
 ```
 
-Acesse o endereço indicado pelo Vite (normalmente `http://127.0.0.1:5173`). Para testar lógica sem baixar dependências: `node --test tests/*.test.mjs`.
+Abra **http://127.0.0.1:5173/**. Na interface, clique **Conectar ao Ollama** e escolha um habitante para conversar. O modelo começa a ser carregado na memória pelo Ollama quando receber a primeira mensagem.
 
-## Diálogos com IA local
+Se o projeto já estiver clonado, basta executar `git pull`, `npm install` e `npm run dev`. Para mudar o modelo, edite o campo **Modelo instalado**, por exemplo `qwen3.5:0.8b`.
 
-Por padrão, as falas são de um **roteiro offline** — não são geradas por modelo. Para experimentar IA de verdade:
+O projeto usa um **proxy apenas no servidor Vite local**: o navegador envia a solicitação para `/api/ollama/chat` na mesma origem e o Vite encaminha ao endpoint `http://127.0.0.1:11434/api/chat`. Assim não é necessário habilitar CORS no Ollama, usar extensões, desativar segurança do navegador ou expor a API na rede.
 
-1. Abra o jogo no navegador e selecione um habitante.
-2. Escolha **CPU / WebAssembly (q8)** ou **GPU / WebGPU (q4f16)**.
-3. Clique em **Carregar IA no navegador**. O primeiro carregamento baixa os arquivos ONNX pela internet.
-4. O modelo [`onnx-community/SmolLM2-135M-Instruct-ONNX-GQA`](https://huggingface.co/onnx-community/SmolLM2-135M-Instruct-ONNX-GQA) roda **dentro de um Web Worker**, sem servidor de inferência e sem Ollama.
-5. Converse normalmente. Se a geração falhar, o sistema informa e usa o diálogo de roteiro.
+Caso sua instalação do Ollama use outra porta, configure a variável de ambiente antes de iniciar o Vite:
 
-A versão de 135 milhões de parâmetros é pequena. Em português pode cometer erros, repetir frases ou ignorar instruções. Os prompts são curtos e as respostas são limitadas. Não trate respostas geradas como fatos do mundo do jogo. Este é um teste de conversação, não uma IA treinada para Tales of Pirates.
+```bash
+WORLDAI_OLLAMA_URL=http://127.0.0.1:11435 npm run dev
+```
 
-**Privacidade:** o texto é processado no navegador; bibliotecas e modelo são baixados de fornecedores externos no primeiro carregamento. O jogo não contém uma API para enviar mensagens a um servidor nosso. Os dados de personagem são guardados em `localStorage`; use o botão de reiniciar para eliminá-los.
+O painel verifica `/api/tags` para confirmar que o modelo está instalado. Se houver erro, o jogo mantém os diálogos offline e mostra uma mensagem.
+
+## Hospedagem
+
+O **GitHub Pages** continua publicando a **demonstração com diálogos de roteiro** em https://faireye-hive.github.io/WorldAI/. A conexão com Ollama é disponibilizada somente na versão local iniciada pelo Vite, porque Pages é um site estático e não tem proxy capaz de acessar seu processo local.
+
+**Não há mais download de ONNX / Transformers.js:** os pesos não são publicados nem obtidos pelo navegador. O arquivo `src/inference.worker.js` ficou no histórico Git da demonstração anterior, mas não é utilizado nesta versão.
 
 ## Arquitetura
 
-| Arquivo | Finalidade |
+| Arquivo | Função |
 | --- | --- |
-| `src/world.js` | Entidades, atributos, necessidades, decisões simples, relógio, conversas, memória e persistência; **sem DOM nem IA** |
-| `src/app.js` | Renderização Canvas 2D, interface, seleção de personagens e fila de solicitações de IA |
-| `src/inference.worker.js` | Transformers.js, carregamento ONNX, WebGPU/WebAssembly e geração em segundo thread |
-| `src/style.css` | Estilo de visual novel e UI responsiva |
-| `tests/world.test.mjs` | Testes de lógica independentes de navegador |
+| `src/world.js` | Estados de NPCs, animais, rotina, relações, memória, decisões e persistência |
+| `src/app.js` | Interface, renderização Canvas 2D e conversa |
+| `src/ollama.js` | Conexão `/api/chat`, validação do modelo, contexto e tratamento de falhas |
+| `src/dialogue.js` | Personalidade, histórico e bloqueio de respostas que repetem a fala do jogador |
+| `vite.config.js` | Proxy local para o Ollama — somente em desenvolvimento |
+| `tests/` | Testes automatizados do mundo, dos diálogos e do conector Ollama |
 
-A **mesma instância de modelo** atende a todos os NPCs; cada um possui histórico e memórias separados. A movimentação e as decisões simples são feitas em JavaScript sem consultar LLM a cada frame. Criaturas atualmente escolhem comportamentos por regras, não por IA generativa.
+Cada NPC mantém sua personalidade, histórico e memória. **O mesmo modelo atende a todos os NPCs.** Conversar com uma criatura gera texto, mas as decisões de navegação e rotina são independentes do LLM nesta etapa. Ações do mundo (economia, inventário, missões) não são modificadas pelo texto gerado.
 
-### Adaptar ao Tales of Pirates
+O motor original de WorldAI com navegação A*, adaptador antigo e integrações está preservado em [`legacy-v0.1/`](./legacy-v0.1/). A demo atual usa um núcleo simplificado; a fusão com o motor original e Tales of Pirates fica para uma etapa futura.
 
-Importe `WorldAIEngine` e mantenha os objetos 3D vinculados aos IDs dos atores. Chame `world.tick(deltaSeconds)` no laço de atualização do Three.js, atualize `mesh.position` pelos valores `actor.x/y` e encaminhe os eventos/interações para a UI. Na integração real, crie um mapeamento de posições 2D do protótipo para coordenadas do mapa, substitua a navegação de demonstração pelo pathfinding do jogo e não permita que diálogos alterem missões, inventário ou economia sem validação do motor.
-
-## Publicação no GitHub Pages
-
-O projeto inclui `.github/workflows/pages.yml`. No GitHub, abra **Settings → Pages → Build and deployment** e selecione **GitHub Actions** (se ainda não estiver). Um push na branch `main` executa o build do Vite usando base `/WorldAI/`. URL esperada, após deploy bem-sucedido: `https://faireye-hive.github.io/WorldAI/`.
-
-**Modelo no Pages + cache do navegador:** no deploy, o GitHub Actions baixa automaticamente os arquivos ONNX Q8 (CPU) e Q4F16 (WebGPU) do Hugging Face para `dist/models/v1/` e os inclui no site estático. **Os pesos não são commitados no Git**, pois excedem 100 MB cada. O navegador baixa a variante escolhida do próprio GitHub Pages na primeira utilização e o Transformers.js utiliza Cache Storage nos acessos seguintes, se o navegador permitir e não eliminar o cache. A opção de CPU e a de WebGPU possuem pesos diferentes e podem exigir downloads separados. O modelo ainda precisa ser carregado na RAM a cada abertura.
-
-No modo de desenvolvimento (`npm run dev`), o modelo continua sendo carregado do Hugging Face e também pode ser armazenado em cache, separadamente da versão publicada. O download/espelhamento para o Pages ocorre somente na execução do workflow. Quem quiser testar os arquivos localmente pode usar `bash scripts/fetch-browser-model.sh public/models/v1`, mas evite adicionar pesos ao histórico do Git. O desempenho depende do dispositivo. WebGPU exige navegador compatível e HTTPS/localhost.
-
-## Testes
+## Verificações
 
 ```bash
 npm test
 npm run build
 ```
 
-MIT.
-## Motor anterior preservado
+Os testes do conector usam respostas simuladas da API. **Não substituem um teste real do Qwen rodando na máquina do usuário.**
 
-O motor original **WorldAI v0.1** foi preservado em [`legacy-v0.1/`](./legacy-v0.1/), incluindo navegação A*, eventos, memória, persistência, adaptador Ollama, testes e a demonstração anterior. O experimento **Living Stories v0.2** usa o núcleo simplificado em `src/world.js`; os dois ainda não foram fundidos. A integração com Tales of Pirates é uma etapa futura.
+## Privacidade e execução
 
+As mensagens para IA são encaminhadas apenas ao servidor **Ollama local** configurado no Vite; não são enviadas a serviços hospedados de inferência. O histórico curto é salvo em `localStorage` na origem do jogo. O Vite usa `127.0.0.1` por padrão para não expor o servidor a dispositivos da rede.
 
-## Futuro: fine-tuning para NPCs
+O Qwen3.5:0.8B pode produzir textos incoerentes, especialmente em conversas complexas. O cliente desativa o modo thinking quando suportado, limita o tamanho de cada resposta e descarta ecos detectados, mas não consegue garantir qualidade.
 
-O SmolLM2-135M-Instruct é um ponto de partida experimental, mas foi treinado principalmente para inglês. Para aprimorar português e diálogos de RPG, o caminho é montar um conjunto de exemplos em JSONL, separar treino/validação, ajustar os pesos com PyTorch e Hugging Face Transformers/TRL e, se necessário, LoRA/PEFT. **Não se treina diretamente o arquivo ONNX quantizado**. Depois do treinamento, exportar e quantizar para ONNX, testar CPU/WebGPU e substituir os arquivos publicados. Os resultados precisam ser avaliados no jogo; mesmo ajustado, um modelo 135M pode ser inconsistente. Evite usar diálogos gerados para mudar o estado econômico ou persistente do jogo sem validação.
+Licença: MIT.
