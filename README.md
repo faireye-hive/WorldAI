@@ -1,6 +1,32 @@
-# WorldAI — Living Stories v0.3 (Ollama local)
+# WorldAI — Living Stories v0.4 (Ollama local + comparador)
 
 Laboratório de NPCs para futura integração com **Tales of Pirates / Three.js**. Inclui vila 2D, **cinco habitantes com conversas**, cinco criaturas com decisões por regras, relações, memória e salvamento. O chat agora usa o **Ollama + Qwen3.5:0.8B**, executado no **seu próprio computador**. Não é necessário baixar modelos no navegador, nem configurar CORS.
+
+## ⚖ Comparador Qwen vs. LFM3 (v0.4)
+
+Agora o WorldAI tem um **comparador de modelos na mesma página do jogo**. Ele usa o Ollama local, sem Transformers.js.
+
+```bash
+ollama pull qwen3.5:0.8b
+ollama pull lfm3:latest
+git pull
+npm install
+npm run dev
+```
+
+Abra `http://127.0.0.1:5173/` e clique em **⚖ Comparar IA**, no topo. Em seguida:
+
+1. **Atualizar modelos** consulta `/api/tags` e lista apenas modelos instalados. Selecione A = `qwen3.5:0.8b` e B = `lfm3:latest`, ou quaisquer dois modelos distintos.
+2. Escolha **um NPC** e digite a pergunta, ou use uma das quatro sugestões.
+3. Clique **Comparar respostas**. O WorldAI congela uma cópia do contexto do personagem e envia a mesma pergunta e os mesmos parâmetros de geração a cada modelo **sequencialmente**, para não disputarem a CPU.
+4. As respostas aparecem lado a lado, junto com tempo no navegador, tempo do servidor Ollama, tempo de carregamento, tokens gerados, velocidade em tokens/s e tokens de entrada.
+5. Marque manualmente a resposta preferida. Os últimos 20 testes desta sessão podem ser **exportados em JSON** para análise posterior.
+
+O comparador **não altera as memórias nem as relações dos NPCs** e não usa respostas de roteiro quando um modelo falha. Se um modelo repetir a pergunta, você verá a resposta real marcada como **REPETIU A PERGUNTA**, sem tentativas automáticas. Se o outro falhar, a primeira resposta continua disponível. O botão **Cancelar teste** interrompe as consultas pendentes. Não existe pontuação automática de qualidade; cabe a você avaliar.
+
+**Interpretação:** o tempo no navegador inclui espera, inferência e eventual carregamento. Tokens/s utiliza `eval_count / eval_duration` retornados pelo Ollama (não é uma medição independente). A primeira consulta a um modelo pode ser mais lenta pela carga em memória; repita testes e compare as métricas por separado. Comparar modelos com contagens de parâmetros muito diferentes não é uma comparação de eficiência por parâmetro. O contexto é o mesmo **dentro de cada teste**, mas os NPCs continuam tendo memória evolutiva no chat principal.
+
+O comparador funciona somente com `npm run dev` no computador com Ollama; **GitHub Pages é demonstração offline**, pois não tem o proxy Vite. O histórico de comparações fica em memória da página até você sair; exporte antes de fechar. O arquivo JSON contém as perguntas, as respostas e o contexto dos NPCs.
 
 ## Testar localmente — Linux
 
@@ -39,7 +65,7 @@ O painel verifica `/api/tags` para confirmar que o modelo está instalado. Se ho
 
 O **GitHub Pages** continua publicando a **demonstração com diálogos de roteiro** em https://faireye-hive.github.io/WorldAI/. A conexão com Ollama é disponibilizada somente na versão local iniciada pelo Vite, porque Pages é um site estático e não tem proxy capaz de acessar seu processo local.
 
-**Não há mais download de ONNX / Transformers.js:** os pesos não são publicados nem obtidos pelo navegador. O arquivo `src/inference.worker.js` ficou no histórico Git da demonstração anterior, mas não é utilizado nesta versão.
+**Não há download de ONNX / Transformers.js:** os pesos não são publicados nem obtidos pelo navegador. O código de inferência antigo ficou preservado no histórico Git.
 
 ## Arquitetura
 
@@ -49,6 +75,8 @@ O **GitHub Pages** continua publicando a **demonstração com diálogos de rotei
 | `src/app.js` | Interface, renderização Canvas 2D e conversa |
 | `src/ollama.js` | Conexão `/api/chat`, validação do modelo, contexto e tratamento de falhas |
 | `src/dialogue.js` | Personalidade, histórico e bloqueio de respostas que repetem a fala do jogador |
+| `src/comparison-core.js` | Benchmark sequencial, métricas do Ollama e comparação sem respostas inventadas |
+| `src/comparator.js` | Interface lado a lado, seleção de modelos, avaliações e exportação JSON |
 | `vite.config.js` | Proxy local para o Ollama — somente em desenvolvimento |
 | `tests/` | Testes automatizados do mundo, dos diálogos e do conector Ollama |
 
