@@ -1,14 +1,18 @@
 import {WorldAIEngine} from './world.js';
 import {DEFAULT_MODEL,checkOllama,askOllama} from './ollama.js';
 import {initComparator} from './comparator.js';
+import {RPGWorld,PLACES} from './rpg.js';
+import {initNPCEditor} from './npc-editor.js';
+import {detectIntent,decideNPCAction} from './npc-actions.js';
 const $=id=>document.getElementById(id);
-const world=new WorldAIEngine();const canvas=$('world'),ctx=canvas.getContext('2d');
+const world=new WorldAIEngine();const rpg=new RPGWorld(world);const canvas=$('world'),ctx=canvas.getContext('2d');
 const state={ready:false,loading:false,busy:false,decisions:0,lastSelected:null,toastUntil:0};
 const hints=['Olá, tudo bem?','Como você se chama?','Você precisa de ajuda?','Conhece algum segredo?'];
 const emojiColors={smith:'#d09e71',merchant:'#b5a2e4',herbalist:'#9dcdb5',guard:'#91b2db',innkeeper:'#dbb69a',wolf:'#a8bccc',deer:'#d2b58f',boar:'#c1a48e'};
 const mapTrees=Array.from({length:43},(_,i)=>{const rnd=n=>((Math.sin(i*127.1+n*51.3)*43758.5453)%1+1)%1;return {x:615+rnd(1)*350,y:55+rnd(2)*520,s:13+rnd(3)*15}});
-function save(){try{localStorage.setItem('worldai-story-save',JSON.stringify(world.export()));}catch{} }
+function save(){try{localStorage.setItem('worldai-story-save',JSON.stringify(world.export()));localStorage.setItem('worldai-rpg-save',JSON.stringify(rpg.export()));}catch{} }
 try{const data=JSON.parse(localStorage.getItem('worldai-story-save')||'null');if(data)world.import(data);}catch{}
+try{const data=JSON.parse(localStorage.getItem('worldai-rpg-save')||'null');if(data)rpg.import(data);}catch{}
 const all=[...world.actors.values()];
 world.onEvent=e=>{if(e.type==='decision')state.decisions++;};
 function renderActors(){const list=$('actor-list');list.replaceChildren();for(const a of all){const b=document.createElement('button');b.className='actor-item'+(a.id===world.selectedId?' selected':'');b.type='button';b.dataset.actorId=a.id;b.innerHTML=`<span class="avatar"></span><span class="copy"><strong></strong><small></small></span><span class="status">●</span>`;b.querySelector('.avatar').textContent=a.emoji;b.querySelector('strong').textContent=a.name;b.querySelector('small').textContent=a.role==='wolf'||a.role==='deer'||a.role==='boar'?'Criatura do bosque':a.role.toUpperCase();b.addEventListener('click',()=>selectActor(a.id));list.appendChild(b);}}
@@ -17,7 +21,8 @@ function appendMessage(type,from,text){const area=$('speech-log');const el=makeM
 function renderConversation(){const a=world.selected;if(!a)return;$('character-name').textContent=a.name;$('character-class').textContent=a.role==='wolf'||a.role==='deer'||a.role==='boar'?'FAUNA LOCAL':a.role.toUpperCase();$('character-mood').textContent='✦ '+a.biography;$('portrait-figure').textContent=a.emoji;$('portrait-area').style.background=`radial-gradient(ellipse at 50% 115%,${emojiColors[a.role]}66,transparent 70%),linear-gradient(120deg,#242a4b,#32304d)`;
  const area=$('speech-log');area.replaceChildren();if(a.history.length===0){appendMessage('npc',a.name,a.species==='human'?'Ah, um novo visitante! Fale comigo para conhecer minha história.':'A criatura olha em sua direção, observando seus movimentos.');}else{for(const item of a.history)appendMessage(item.role==='user'?'user':'npc',item.role==='user'?'VOCÊ':a.name,item.content);}
  $('story-counter').textContent='MEMÓRIA: '+a.memories.length;$('suggestions').replaceChildren();for(const h of hints){const btn=document.createElement('button');btn.type='button';btn.textContent=h;btn.disabled=state.busy;btn.addEventListener('click',()=>sendMessage(h));$('suggestions').appendChild(btn);} $('chat-input').placeholder=`Conversar com ${a.name}...`;}
-function selectActor(id){world.select(id);state.lastSelected=id;renderActors();renderConversation();save();}
+let editor=null;
+function selectActor(id){world.select(id);state.lastSelected=id;renderActors();renderConversation();editor?.refresh();save();}
 function setAIStatus(text,kind='off',details=''){$('model-badge').textContent=text;$('model-badge').className='pill '+kind;if(details)$('model-state').textContent=details;$('dialog-source').textContent=state.ready?'✳ Respostas por Ollama local ('+($('model-name').value.trim()||DEFAULT_MODEL)+')':'◆ Diálogos offline de demonstração';}
 async function connectOllama(){
  if(state.ready||state.loading)return;
@@ -54,8 +59,24 @@ async function requestAI(actor,question){
  const context={...world.getConversationContext(actor),question};
  return askOllama(context,{model:$('model-name').value.trim()||DEFAULT_MODEL});
 }
-async function sendMessage(text){text=String(text).trim();if(!text||state.busy)return;const a=world.selected;if(!a)return;state.busy=true;$('chat-submit').disabled=true;$('chat-input').disabled=true;for(const b of $('suggestions').querySelectorAll('button'))b.disabled=true;$('chat-input').value='';const userMsg=appendMessage('user','VOCÊ',text);const busy=appendMessage('npc',a.name,'Pensando...');busy.classList.add('pending');let reply,mode='script';try{if(state.ready){mode='ollama';try{reply=await requestAI(a,text);}catch(err){reply=world.scriptedReply(a,text);mode='fallback';$('dialog-feedback').textContent='Ollama: '+String(err.message).slice(0,170)+' — diálogo de roteiro.';}}else reply=world.scriptedReply(a,text);world.interact(a,text,reply,mode);busy.remove();appendMessage('npc',a.name,reply);if(world.selectedId===a.id)$('story-counter').textContent='MEMÓRIA: '+a.memories.length;save();}finally{state.busy=false;$('chat-submit').disabled=false;$('chat-input').disabled=false;for(const b of $('suggestions').querySelectorAll('button'))b.disabled=false;$('chat-input').focus();}}
-$('chat-form').addEventListener('submit',e=>{e.preventDefault();sendMessage($('chat-input').value);});$('pause').addEventListener('click',()=>{world.paused=!world.paused;$('pause').textContent=world.paused?'▶':'Ⅱ';});$('reset').addEventListener('click',()=>{if(!confirm('Reiniciar o mundo e apagar conversas salvas?'))return;localStorage.removeItem('worldai-story-save');location.reload();});$('save-world').addEventListener('click',()=>{save();$('save-world').textContent='✓ Salvo';setTimeout(()=>$('save-world').textContent='↓ Salvar progresso',1600);});
+async function sendMessage(text){text=String(text).trim();if(!text||state.busy)return;const a=world.selected;if(!a)return;state.busy=true;$('chat-submit').disabled=true;$('chat-input').disabled=true;for(const b of $('suggestions').querySelectorAll('button'))b.disabled=true;$('chat-input').value='';const userMsg=appendMessage('user','VOCÊ',text);const busy=appendMessage('npc',a.name,'Pensando...');busy.classList.add('pending');let reply,mode='script';try{
+  const intent=detectIntent(text);
+  if(intent){
+    const decision=state.ready?await decideNPCAction(text,a,rpg,{model:$('model-name').value.trim()||DEFAULT_MODEL}):{proposal:intent,mode:'rules'};
+    const outcome=rpg.perform(a.id,decision.proposal||intent);
+    reply=outcome.message;mode='action-'+decision.mode;
+    editor?.displayBag();
+    editor?.showMessage(outcome.message);
+  }else if(state.ready){
+    mode='ollama';
+    try{reply=await requestAI(a,text);}catch(err){
+      reply=world.scriptedReply(a,text);mode='fallback';
+      $('dialog-feedback').textContent='Ollama: '+String(err.message).slice(0,170)+' — diálogo de roteiro.';
+    }
+  }else reply=world.scriptedReply(a,text);
+  world.interact(a,text,reply,mode);busy.remove();
+  if(world.selectedId===a.id)appendMessage('npc',a.name,reply);if(world.selectedId===a.id)$('story-counter').textContent='MEMÓRIA: '+a.memories.length;save();}finally{state.busy=false;$('chat-submit').disabled=false;$('chat-input').disabled=false;for(const b of $('suggestions').querySelectorAll('button'))b.disabled=false;$('chat-input').focus();}}
+$('chat-form').addEventListener('submit',e=>{e.preventDefault();sendMessage($('chat-input').value);});$('pause').addEventListener('click',()=>{world.paused=!world.paused;$('pause').textContent=world.paused?'▶':'Ⅱ';});$('reset').addEventListener('click',()=>{if(!confirm('Reiniciar o mundo e apagar conversas salvas?'))return;localStorage.removeItem('worldai-story-save');localStorage.removeItem('worldai-rpg-save');location.reload();});$('save-world').addEventListener('click',()=>{save();$('save-world').textContent='✓ Salvo';setTimeout(()=>$('save-world').textContent='↓ Salvar progresso',1600);});
 function polygon(points,fill){ctx.beginPath();ctx.moveTo(points[0][0],points[0][1]);for(let i=1;i<points.length;i++)ctx.lineTo(points[i][0],points[i][1]);ctx.closePath();ctx.fillStyle=fill;ctx.fill();}
 function rounded(x,y,w,h,r,fill){ctx.fillStyle=fill;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();}
 function line(x,y,x2,y2,width,color){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x2,y2);ctx.strokeStyle=color;ctx.lineWidth=width;ctx.lineCap='round';ctx.stroke();}
@@ -73,6 +94,23 @@ function drawBackground(){const W=1000,H=620;const bg=ctx.createLinearGradient(0
 function drawActor(a){const x=a.x,y=a.y,selected=a.id===world.selectedId;ctx.fillStyle='#182c3180';ctx.beginPath();ctx.ellipse(x,y+15,15,5,0,0,Math.PI*2);ctx.fill();if(selected){ctx.strokeStyle='#f3e5a1';ctx.lineWidth=2.5;ctx.beginPath();ctx.ellipse(x,y+14,20,7,0,0,Math.PI*2);ctx.stroke();}
  const bounce=Math.sin(a.phase)*1.6;ctx.save();ctx.translate(x,y+bounce);if(a.species==='human'){ctx.fillStyle=a.color;rounded(-9,-4,18,21,6,a.color);ctx.fillStyle='#293047';rounded(-7,11,5,7,2,'#293047');rounded(2,11,5,7,2,'#293047');ctx.fillStyle='#f1c8a6';ctx.beginPath();ctx.arc(0,-10,10,0,Math.PI*2);ctx.fill();ctx.fillStyle=a.id==='marcus'?'#654836':a.id==='soren'?'#495876':'#644b46';ctx.beginPath();ctx.arc(0,-14,10,Math.PI,Math.PI*2);ctx.fill();ctx.fillStyle='#273244';ctx.fillRect(-4,-11,2,2);ctx.fillRect(3,-11,2,2);}else{ctx.font='25px serif';ctx.textAlign='center';ctx.fillText(a.emoji,0,4);}ctx.restore();if(selected||a.species==='human'){rounded(x-35,y-46,70,16,5,'#0c2038cc');ctx.font='bold 10px DM Sans, sans-serif';ctx.textAlign='center';ctx.fillStyle='#fff5e6';ctx.fillText(a.name,x,y-35);}}
 function drawPlayer(){const p=world.player;ctx.fillStyle='#153b4350';ctx.beginPath();ctx.ellipse(p.x,p.y+16,14,6,0,0,Math.PI*2);ctx.fill();rounded(p.x-10,p.y-4,20,22,5,'#4165a8');ctx.fillStyle='#f7cda9';ctx.beginPath();ctx.arc(p.x,p.y-11,10,0,Math.PI*2);ctx.fill();ctx.fillStyle='#3b3342';ctx.beginPath();ctx.arc(p.x,p.y-13,10,Math.PI,Math.PI*2);ctx.fill();ctx.font='bold 10px DM Sans,sans-serif';ctx.textAlign='center';ctx.fillStyle='white';ctx.fillText('VOCÊ',p.x,p.y-34);ctx.strokeStyle='#c6e0ff';ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(p.x,p.y+17,17,6,0,0,Math.PI*2);ctx.stroke();}
-function draw(){ctx.clearRect(0,0,1000,620);drawBackground();for(const a of [...all].sort((a,b)=>a.y-b.y))drawActor(a);drawPlayer();$('world-clock').textContent=world.clock;$('day-label').textContent=world.isNight?'NOITE':'DIA';$('world-decisions').textContent=state.decisions;}
+function draw(){ctx.clearRect(0,0,1000,620);drawBackground();
+ if(rpg.escort){
+  const npc=world.actors.get(rpg.escort.actorId),loc=PLACES.find(p=>p.id===rpg.escort.placeId);
+  if(npc&&loc){
+   ctx.save();ctx.strokeStyle='#ffdc8e';ctx.lineWidth=4;ctx.setLineDash([12,10]);
+   ctx.beginPath();ctx.moveTo(world.player.x,world.player.y);ctx.lineTo(npc.x,npc.y);ctx.lineTo(loc.x,loc.y);ctx.stroke();ctx.restore();
+   ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.fillStyle='#fff0c4';ctx.fillText('📍 '+loc.name,loc.x,loc.y-25);
+  }
+ }
+ for(const a of [...all].sort((a,b)=>a.y-b.y))drawActor(a);drawPlayer();$('world-clock').textContent=world.clock;$('day-label').textContent=world.isNight?'NOITE':'DIA';$('world-decisions').textContent=state.decisions;}
 canvas.addEventListener('click',e=>{const rect=canvas.getBoundingClientRect();const p={x:(e.clientX-rect.left)/rect.width*1000,y:(e.clientY-rect.top)/rect.height*620};let nearest=null;let nearDist=31;for(const a of all){const d=Math.hypot(a.x-p.x,a.y-p.y);if(d<nearDist){nearest=a;nearDist=d;}}if(nearest){selectActor(nearest.id);if(window.innerWidth<=1030)$('chat-input').scrollIntoView({block:'nearest',behavior:'smooth'});}else{world.movePlayer(p.x,p.y);}});
-let previous=performance.now();function frame(now){world.tick((now-previous)/1000);previous=now;draw();requestAnimationFrame(frame);}renderActors();renderConversation();initComparator(world);requestAnimationFrame(frame);setInterval(save,20000);addEventListener('beforeunload',save);
+let previous=performance.now();function frame(now){const dt=(now-previous)/1000;world.tick(dt);rpg.tick(dt);previous=now;draw();requestAnimationFrame(frame);}
+renderActors();renderConversation();
+editor=initNPCEditor(world,rpg,{
+ onChanged:()=>{renderActors();renderConversation();save();},
+ onAdded:a=>{all.push(a);renderActors();renderConversation();save();},
+ onAction:outcome=>{if(outcome.ok)save();}
+});
+initComparator(world);
+requestAnimationFrame(frame);setInterval(save,20000);addEventListener('beforeunload',save);
