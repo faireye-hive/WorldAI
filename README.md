@@ -1,6 +1,25 @@
-# WorldAI — Living Stories v0.4 (Ollama local + comparador)
+# WorldAI — Living Stories v0.5 (NPC editor + ações RPG)
 
-Laboratório de NPCs para futura integração com **Tales of Pirates / Three.js**. Inclui vila 2D, **cinco habitantes com conversas**, cinco criaturas com decisões por regras, relações, memória e salvamento. O chat agora usa o **Ollama + Qwen3.5:0.8B**, executado no **seu próprio computador**. Não é necessário baixar modelos no navegador, nem configurar CORS.
+Laboratório de NPCs para futura integração com **Tales of Pirates / Three.js**. Inclui vila 2D, **cinco habitantes com conversas**, cinco criaturas com decisões por regras, relações, memória e salvamento. O chat agora usa o **Ollama + LFM3 ou Qwen3.5**, executado no **seu próprio computador**. Não é necessário baixar modelos no navegador, nem configurar CORS.
+
+## 🧑‍🌾 Editor de NPCs e decisões (v0.5)
+
+A demonstração agora inclui **✦ Editar NPCs**, antes do comparador, com um editor totalmente local. Você pode:
+
+- Criar até 80 personagens no mundo 2D ou editar os habitantes existentes, com **nome, título, profissão, espécie, personalidade, história/conhecimento e ícone**.
+- Escolher exatamente quais ações são permitidas: **guiar**, **vender ao jogador**, **comprar do jogador** e **dar itens do próprio estoque**.
+- Editar as **moedas e o estoque** de cada NPC para os seis itens de exemplo; conferir as moedas e o inventário do jogador.
+- Executar ações com botões ou pedir pelo chat: **“Me leve até a ponte”**, **“Me venda uma poção”**, **“Quero vender ferro”** e **“Me dê uma erva”**.
+- Consultar o estado e as decisões do NPC, acompanhar visualmente a rota guiada e exportar **`worldai-npcs.json`**.
+- Manter perfis, customizações e a bolsa do jogador entre sessões pelo `localStorage`.
+
+### Como a decisão funciona
+
+O WorldAI identifica comandos explícitos de ações. Se o local ou item estiver ambíguo, ele pode perguntar ao modelo **Ollama selecionado** por uma proposta JSON dentre ações e destinos conhecidos. Se o modelo não estiver disponível ou gerar uma resposta inválida, permanecem as regras conservadoras do jogo. As **decisões só são executadas pelo motor RPG**, que verifica permissões do NPC, distância, local conhecido, item existente, quantidades, moedas, itens possuídos e estoque finito. O modelo não cria itens ou modifica diretamente o dinheiro. Para ações conhecidas e claras, as regras locais podem dispensar uma chamada ao LLM e responder imediatamente.
+
+**Esta versão é um sandbox, não o sistema definitivo de missões/comércio do Tales of Pirates.** O guia segue uma linha reta dentro do mapa 2D de demonstração, sem desviar de edifícios. Para integrar ao Three.js, conectaremos o comando de guia ao sistema de pathfinding, e todas as ações econômicas deverão ser validadas pela lógica real de inventário e comércio do jogo (ou pelo servidor em ambiente multiplayer).
+
+O modelo padrão sugerido na interface passou a ser `lfm3:latest`, mas você pode escolher `qwen3.5:0.8b` ou outro instalado. O comparador continua separado e inalterado.
 
 ## ⚖ Comparador Qwen vs. LFM3 (v0.4)
 
@@ -30,7 +49,7 @@ O comparador funciona somente com `npm run dev` no computador com Ollama; **GitH
 
 ## Testar localmente — Linux
 
-Pré-requisitos: Node.js >=20, Ollama em execução em `127.0.0.1:11434` e o modelo `qwen3.5:0.8b` instalado.
+Pré-requisitos: Node.js >=20, Ollama em execução em `127.0.0.1:11434` e um modelo de chat instalado, como `lfm3:latest` ou `qwen3.5:0.8b`.
 
 ```bash
 # Verificar instalação local
@@ -77,6 +96,9 @@ O **GitHub Pages** continua publicando a **demonstração com diálogos de rotei
 | `src/dialogue.js` | Personalidade, histórico e bloqueio de respostas que repetem a fala do jogador |
 | `src/comparison-core.js` | Benchmark sequencial, métricas do Ollama e comparação sem respostas inventadas |
 | `src/comparator.js` | Interface lado a lado, seleção de modelos, avaliações e exportação JSON |
+| `src/rpg.js` | Catálogo fixo de itens e lugares, NPCs customizáveis, validação de estoque, comércio e navegação guiada |
+| `src/npc-editor.js` | Interface para criar/editar NPCs, conceder permissões e exportar JSON |
+| `src/npc-actions.js` | Identificação de intenção e proposta JSON do Ollama para ações ambíguas |
 | `vite.config.js` | Proxy local para o Ollama — somente em desenvolvimento |
 | `tests/` | Testes automatizados do mundo, dos diálogos e do conector Ollama |
 
