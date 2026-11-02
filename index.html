@@ -30,7 +30,7 @@
           <p>Crie e personalize personagens. Defina o que sabem, como agem e quais itens possuem.</p>
         </div>
         <div class="npc-editor-head-actions"><button type="button" id="npc-edit-selected" class="cmp-secondary">Editar NPC selecionado</button>
-          <button type="button" id="npc-edit-new" class="cmp-secondary">+ Criar novo NPC</button></div>
+          <button type="button" id="npc-edit-new" class="cmp-secondary">+ Criar novo NPC</button><button type="button" id="npc-export" class="cmp-secondary">↓ Exportar NPCs JSON</button></div>
       </header>
       <div class="npc-edit-layout">
         <form id="npc-edit-form" class="npc-edit-form">
@@ -50,7 +50,7 @@
         <div class="npc-action-sandbox">
           <h3>🎮 Teste ações reais no mundo</h3><p>O motor valida distância, permissões, moedas, quantidade e estoque. A IA não pode criar itens nem dinheiro.</p>
           <div class="npc-player-bag" id="npc-player-bag"></div>
-          <p class="npc-nearby" id="npc-distance"></p>
+          <p class="npc-nearby" id="npc-distance"></p><p class="npc-nearby" id="npc-current-state">Atividade: aguardando...</p>
           <div class="npc-action-args">
             <label>Destino<select id="npc-place"></select></label>
             <label>Item<select id="npc-item"></select></label>
