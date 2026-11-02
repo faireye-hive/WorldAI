@@ -55,3 +55,6 @@ npm run build
 ```
 
 MIT.
+## Motor anterior preservado
+
+O motor original **WorldAI v0.1** foi preservado em [`legacy-v0.1/`](./legacy-v0.1/), incluindo navegação A*, eventos, memória, persistência, adaptador Ollama, testes e a demonstração anterior. O experimento **Living Stories v0.2** usa o núcleo simplificado em `src/world.js`; os dois ainda não foram fundidos. A integração com Tales of Pirates é uma etapa futura.
