@@ -25,11 +25,12 @@ export function initComparator(world) {
     const valid=installed.includes(selectedA)&&installed.includes(selectedB)&&selectedA!==selectedB;
     run.disabled=running || !valid || import.meta.env.PROD;
     cancel.disabled=!running;
-    refresh.disabled=running;
-    modelA.disabled=running;modelB.disabled=running;
-    character.disabled=running;prompt.disabled=running;
+    refresh.disabled=running || import.meta.env.PROD;
+    modelA.disabled=running || import.meta.env.PROD;modelB.disabled=running || import.meta.env.PROD;
+    character.disabled=running || import.meta.env.PROD;prompt.disabled=running || import.meta.env.PROD;
     voteA.disabled=running||!currentRecord||currentRecord.results.length<2;
     voteB.disabled=voteA.disabled;
+    byId('cmp-fill-selected').disabled=running || import.meta.env.PROD;
     exportButton.disabled=histories.length===0;
   }
   const actorChoices=[...world.actors.values()];
@@ -133,7 +134,7 @@ export function initComparator(world) {
   async function runComparison(){
     if(running)return;
     const selectedA=modelA.value,selectedB=modelB.value;
-    if(!installed.includes(selectedA)||!installed.includes(selectedB)||selectedA===selectedB){
+    if(import.meta.env.PROD||!installed.includes(selectedA)||!installed.includes(selectedB)||selectedA===selectedB){
       tell('Escolha dois modelos diferentes e instalados.');return;
     }
     const question=prompt.value.trim().slice(0,240);
