@@ -97,6 +97,7 @@ export function initNPCEditor(world,rpg,{onChanged=()=>{},onAdded=()=>{},onActio
   }
   const selected=world.actors.get(select.value),p=selected&&rpg.profile(selected.id);
   const near=selected?rpg.near(selected):false;
+  $('npc-current-state').textContent=selected?'Decisão atual: '+selected.state+(rpg.escort?.actorId===selected.id?' · Guiando até '+rpg.escort.placeId:''):'Nenhum NPC selecionado';
   $('npc-distance').textContent=selected
    ?(near?'✔ Perto de '+selected.name+' — ações liberadas.':'⚠ '+selected.name+' está longe. Clique perto dele no mapa para se aproximar.')
    :'Selecione um personagem.';
@@ -131,6 +132,13 @@ export function initNPCEditor(world,rpg,{onChanged=()=>{},onAdded=()=>{},onActio
  });
  $('npc-edit-new').addEventListener('click',()=>{
   if(creating)fill(world.selectedId);else clearNew();
+ });
+ $('npc-export').addEventListener('click',()=>{
+  const out={version:1,source:'WorldAI RPG demo',rpg:rpg.export()};
+  const url=URL.createObjectURL(new Blob([JSON.stringify(out,null,2)],{type:'application/json'}));
+  const a=document.createElement('a');a.href=url;a.download='worldai-npcs.json';a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  setMsg('Configurações e estoque exportados em worldai-npcs.json.');
  });
  $('npc-edit-selected').addEventListener('click',()=>{
   refreshActors(world.selectedId);fill(world.selectedId);displayBag();
