@@ -3,7 +3,7 @@ import {PLACES,ITEMS} from './rpg.js';
 
 const norm=text=>String(text||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 export function detectIntent(text){
- const s=norm(text);
+ const s=norm(text).replace(/\bpocoes\b/g,'pocao').replace(/\bervas\b/g,'erva').replace(/\bmacas\b/g,'maca');
  let action=null;
  if(/\b(me leve|me leva|leve-me|me mostre|me mostra|me guie|me guia|acompanhe-me|guie-me|me acompanhe|me conduza|vamos ate|ir ate|caminho para)\b/.test(s))action='guide';
  else if(/\b(quero comprar|posso comprar|me venda|me vende|comprar|compro)\b/.test(s))action='buy';
