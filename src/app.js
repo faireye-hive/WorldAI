@@ -1,7 +1,8 @@
 import {WorldAIEngine} from './world.js';
+import {DEFAULT_MODEL,checkOllama,askOllama} from './ollama.js';
 const $=id=>document.getElementById(id);
 const world=new WorldAIEngine();const canvas=$('world'),ctx=canvas.getContext('2d');
-const state={ready:false,loading:false,busy:false,requestId:0,pending:new Map(),worker:null,decisions:0,lastSelected:null,toastUntil:0};
+const state={ready:false,loading:false,busy:false,decisions:0,lastSelected:null,toastUntil:0};
 const hints=['Olá, tudo bem?','Como você se chama?','Você precisa de ajuda?','Conhece algum segredo?'];
 const emojiColors={smith:'#d09e71',merchant:'#b5a2e4',herbalist:'#9dcdb5',guard:'#91b2db',innkeeper:'#dbb69a',wolf:'#a8bccc',deer:'#d2b58f',boar:'#c1a48e'};
 const mapTrees=Array.from({length:43},(_,i)=>{const rnd=n=>((Math.sin(i*127.1+n*51.3)*43758.5453)%1+1)%1;return {x:615+rnd(1)*350,y:55+rnd(2)*520,s:13+rnd(3)*15}});
@@ -16,17 +17,43 @@ function renderConversation(){const a=world.selected;if(!a)return;$('character-n
  const area=$('speech-log');area.replaceChildren();if(a.history.length===0){appendMessage('npc',a.name,a.species==='human'?'Ah, um novo visitante! Fale comigo para conhecer minha história.':'A criatura olha em sua direção, observando seus movimentos.');}else{for(const item of a.history)appendMessage(item.role==='user'?'user':'npc',item.role==='user'?'VOCÊ':a.name,item.content);}
  $('story-counter').textContent='MEMÓRIA: '+a.memories.length;$('suggestions').replaceChildren();for(const h of hints){const btn=document.createElement('button');btn.type='button';btn.textContent=h;btn.disabled=state.busy;btn.addEventListener('click',()=>sendMessage(h));$('suggestions').appendChild(btn);} $('chat-input').placeholder=`Conversar com ${a.name}...`;}
 function selectActor(id){world.select(id);state.lastSelected=id;renderActors();renderConversation();save();}
-function setAIStatus(text,kind='off',details=''){$('model-badge').textContent=text;$('model-badge').className='pill '+kind;if(details)$('model-state').textContent=details;$('dialog-source').textContent=state.ready?'✳ Respostas por IA local no navegador':'◆ Diálogos offline de demonstração';}
-function ensureWorker(){if(state.worker)return state.worker;state.worker=new Worker(new URL('./inference.worker.js',import.meta.url),{type:'module'});state.worker.onmessage=({data})=>{
- if(data.type==='progress'){if(Number.isFinite(data.progress)){$('progress-track').hidden=false;$('progress-bar').style.width=data.progress+'%';$('model-state').textContent=`Baixando/carregando ${data.file||'modelo'}... ${data.progress}%`;}}
- if(data.type==='ready'){state.loading=false;state.ready=true;$('load-model').disabled=false;$('load-model').textContent='✓ IA carregada';$('backend').disabled=true;$('progress-track').hidden=true;setAIStatus('IA LOCAL ATIVA','on','SmolLM2-135M carregado. O texto é gerado no seu navegador, sem servidor de inferência.');}
- if(data.type==='error'){state.loading=false;state.ready=false;$('load-model').disabled=false;$('load-model').textContent='↻ Tentar novamente';$('progress-track').hidden=true;setAIStatus('FALHA NA IA','off',data.message+' — o modo roteiro continua disponível.');}
- if(data.type==='response'||data.type==='generation_error'){const waiting=state.pending.get(data.id);state.pending.delete(data.id);if(waiting){data.type==='response'?waiting.resolve(data.reply):waiting.reject(new Error(data.message));}}};state.worker.onerror=ev=>{setAIStatus('ERRO DO WORKER','off','Falha ao carregar o worker. Verifique o console e recarregue a página.');state.ready=false;state.loading=false;$('load-model').disabled=false;for(const p of state.pending.values())p.reject(new Error('Worker indisponível'));state.pending.clear();};return state.worker;}
-$('load-model').addEventListener('click',()=>{if(state.ready||state.loading)return;if($('backend').value==='webgpu'&&!navigator.gpu){setAIStatus('WEBGPU AUSENTE','off','Seu navegador não possui WebGPU disponível. Selecione CPU / WebAssembly.');return;}// Ask the browser to retain cached model files across sessions when supported.
-if(navigator.storage?.persist)navigator.storage.persist().catch(()=>{});
-state.loading=true;setAIStatus('CARREGANDO','loading','Verificando cache do navegador; o primeiro acesso pode baixar 118–137 MB...');$('load-model').disabled=true;ensureWorker().postMessage({type:'load',backend:$('backend').value});});
-async function requestAI(actor,question){const id=++state.requestId;const context={...world.getConversationContext(actor),question};return new Promise((resolve,reject)=>{state.pending.set(id,{resolve,reject});state.worker.postMessage({type:'generate',id,context});});}
-async function sendMessage(text){text=String(text).trim();if(!text||state.busy)return;const a=world.selected;if(!a)return;state.busy=true;$('chat-submit').disabled=true;$('chat-input').disabled=true;for(const b of $('suggestions').querySelectorAll('button'))b.disabled=true;$('chat-input').value='';const userMsg=appendMessage('user','VOCÊ',text);const busy=appendMessage('npc',a.name,'Pensando...');busy.classList.add('pending');let reply,mode='script';try{if(state.ready){mode='transformersjs';try{reply=await requestAI(a,text);}catch(err){reply=world.scriptedReply(a,text);mode='fallback';$('dialog-feedback').textContent='A IA não conseguiu responder sem repetir ou ocorreu um erro; mostrando diálogo de roteiro.';}}else reply=world.scriptedReply(a,text);world.interact(a,text,reply,mode);busy.remove();appendMessage('npc',a.name,reply);if(world.selectedId===a.id)$('story-counter').textContent='MEMÓRIA: '+a.memories.length;save();}finally{state.busy=false;$('chat-submit').disabled=false;$('chat-input').disabled=false;for(const b of $('suggestions').querySelectorAll('button'))b.disabled=false;$('chat-input').focus();}}
+function setAIStatus(text,kind='off',details=''){$('model-badge').textContent=text;$('model-badge').className='pill '+kind;if(details)$('model-state').textContent=details;$('dialog-source').textContent=state.ready?'✳ Respostas por Ollama local (Qwen)':'◆ Diálogos offline de demonstração';}
+async function connectOllama(){
+ if(state.ready||state.loading)return;
+ if(import.meta.env.PROD){
+  setAIStatus('APENAS LOCAL','off','Abra o repositório no computador com Ollama e execute npm run dev. O GitHub Pages não executa o proxy local.');
+  return;
+ }
+ const model=$('model-name').value.trim()||DEFAULT_MODEL;
+ state.loading=true;
+ $('load-model').disabled=true;
+ setAIStatus('CONECTANDO','loading','Consultando 127.0.0.1:11434 pelo proxy local do Vite...');
+ try{
+  await checkOllama({model});
+  state.ready=true;
+  $('model-name').disabled=true;
+  $('load-model').textContent='✓ Ollama conectado';
+  setAIStatus('OLLAMA CONECTADO','on',model+' disponível. A primeira mensagem pode demorar até o modelo carregar na memória.');
+ }catch(error){
+  state.ready=false;
+  $('load-model').textContent='↻ Tentar novamente';
+  setAIStatus('OLLAMA OFFLINE','off',error.message);
+ }finally{
+  state.loading=false;
+  $('load-model').disabled=false;
+ }
+}
+$('load-model').addEventListener('click',connectOllama);
+if(import.meta.env.PROD){
+ $('load-model').disabled=true;
+ $('load-model').textContent='Disponível na versão local';
+ setAIStatus('MODO ROTEIRO','off','Para conversar usando o seu Ollama, execute este projeto via npm run dev no computador com o modelo instalado.');
+}
+async function requestAI(actor,question){
+ const context={...world.getConversationContext(actor),question};
+ return askOllama(context,{model:$('model-name').value.trim()||DEFAULT_MODEL});
+}
+async function sendMessage(text){text=String(text).trim();if(!text||state.busy)return;const a=world.selected;if(!a)return;state.busy=true;$('chat-submit').disabled=true;$('chat-input').disabled=true;for(const b of $('suggestions').querySelectorAll('button'))b.disabled=true;$('chat-input').value='';const userMsg=appendMessage('user','VOCÊ',text);const busy=appendMessage('npc',a.name,'Pensando...');busy.classList.add('pending');let reply,mode='script';try{if(state.ready){mode='transformersjs';try{reply=await requestAI(a,text);}catch(err){reply=world.scriptedReply(a,text);mode='fallback';$('dialog-feedback').textContent='Ollama: '+String(err.message).slice(0,170)+' — diálogo de roteiro.';}}else reply=world.scriptedReply(a,text);world.interact(a,text,reply,mode);busy.remove();appendMessage('npc',a.name,reply);if(world.selectedId===a.id)$('story-counter').textContent='MEMÓRIA: '+a.memories.length;save();}finally{state.busy=false;$('chat-submit').disabled=false;$('chat-input').disabled=false;for(const b of $('suggestions').querySelectorAll('button'))b.disabled=false;$('chat-input').focus();}}
 $('chat-form').addEventListener('submit',e=>{e.preventDefault();sendMessage($('chat-input').value);});$('pause').addEventListener('click',()=>{world.paused=!world.paused;$('pause').textContent=world.paused?'▶':'Ⅱ';});$('reset').addEventListener('click',()=>{if(!confirm('Reiniciar o mundo e apagar conversas salvas?'))return;localStorage.removeItem('worldai-story-save');location.reload();});$('save-world').addEventListener('click',()=>{save();$('save-world').textContent='✓ Salvo';setTimeout(()=>$('save-world').textContent='↓ Salvar progresso',1600);});
 function polygon(points,fill){ctx.beginPath();ctx.moveTo(points[0][0],points[0][1]);for(let i=1;i<points.length;i++)ctx.lineTo(points[i][0],points[i][1]);ctx.closePath();ctx.fillStyle=fill;ctx.fill();}
 function rounded(x,y,w,h,r,fill){ctx.fillStyle=fill;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();}
