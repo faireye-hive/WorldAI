@@ -53,3 +53,40 @@
 button:disabled{opacity:.5}
 @media(max-width:980px){.cmp-results{grid-template-columns:1fr}.cmp-shortcut{font-size:10px}}
 @media(max-width:620px){.compare-panel{padding:15px}.cmp-header{flex-wrap:wrap}.cmp-header h2{font-size:25px}.cmp-model-selectors{grid-template-columns:minmax(0,1fr);gap:7px}.cmp-versus{padding:0}.cmp-actor-row label{flex:1 1 100%}.cmp-actor-row button{width:100%}.cmp-actions>button{width:100%}.cmp-history-entry{flex-wrap:wrap}.cmp-history-entry small{flex:1 1 100%}.cmp-shortcut{padding:8px}}
+
+
+/* WorldAI NPC designer / action playground */
+.npc-editor{background:#151c31;border:1px solid #384361;border-radius:18px;margin-top:18px;padding:22px;min-width:0}
+.npc-editor-head{display:flex;justify-content:space-between;align-items:start;gap:14px;flex-wrap:wrap}
+.npc-editor-head h2{font:normal 27px/1.1 'DM Serif Display',serif;margin:9px 0}
+.npc-editor-head p,.npc-action-sandbox>p{color:#9bacc8;font-size:12px;line-height:1.65;margin:4px 0 12px}
+.npc-editor-head-actions{display:flex;gap:9px;flex-wrap:wrap}
+.npc-edit-layout{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);gap:17px;margin-top:18px}
+.npc-edit-form,.npc-action-sandbox{background:#101729;border:1px solid #333d5b;border-radius:15px;padding:17px;min-width:0}
+.npc-edit-form label,.npc-action-args label{color:#b8c2dc;font-size:11px;font-weight:700;display:flex;flex-direction:column;gap:7px;min-width:0}
+.npc-edit-form select,.npc-edit-form input,.npc-edit-form textarea,.npc-action-args select,.npc-action-args input{background:#19233a;border:1px solid #3b4869;color:#f3f2fa;border-radius:9px;padding:10px;outline:none;width:100%;min-width:0;font-size:13px}
+.npc-edit-form input:focus,.npc-edit-form select:focus,.npc-edit-form textarea:focus{border-color:#b5a2e8}
+.npc-edit-form textarea{resize:vertical;line-height:1.5}
+.npc-edit-form{display:flex;flex-direction:column;gap:13px}
+.npc-form-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.npc-stock,.npc-action-permissions{border:1px solid #3c4667;border-radius:12px;margin:0;padding:11px}
+.npc-stock legend,.npc-action-permissions legend{font-size:11px;font-weight:800;color:#cabaf5;padding:0 6px}
+#npc-actions-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+#npc-actions-grid label{display:flex;align-items:center;flex-direction:row;gap:7px;font-size:11px}
+#npc-actions-grid input{width:auto;accent-color:#bca3f6}
+#npc-stock-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+#npc-stock-grid input{width:100%}
+.npc-action-sandbox h3{font-size:16px;margin:0 0 12px}
+.npc-player-bag{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.npc-player-bag strong,.npc-player-bag span{font-size:11px;background:#27324b;padding:7px 9px;border-radius:9px;color:#e3e7f5}
+.npc-player-bag strong{background:#5b4930;color:#ffe5a6}
+.npc-nearby{font-size:11px;color:#c0cead;background:#242d3a;border-radius:9px;padding:10px}
+.npc-action-args{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin-top:14px}
+.npc-action-args label:first-child{grid-column:1/-1}
+.npc-manual-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:15px}
+.npc-manual-actions button{background:#29334f;border:1px solid #62658a;border-radius:10px;padding:12px 9px;color:#e0e3f5;font-size:11px;font-weight:800}
+.npc-manual-actions button:not(:disabled):hover{background:#3d4068;border-color:#b8a6ed}
+.npc-action-sandbox .npc-test-notice{font-size:11px;color:#8c9fbd;margin-top:14px}
+.npc-editor-status{min-height:19px;color:#c7b0fb;font-size:12px;margin:14px 0 0;line-height:1.5}
+@media(max-width:1070px){.npc-edit-layout{grid-template-columns:1fr}}
+@media(max-width:620px){.npc-editor{padding:13px}.npc-form-row{grid-template-columns:repeat(2,minmax(0,1fr))}#npc-stock-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.npc-action-args{grid-template-columns:1fr}.npc-action-args label:first-child{grid-column:auto}.npc-manual-actions{grid-template-columns:1fr}.npc-editor-head-actions{width:100%}.npc-editor-head-actions button{flex:1 1 auto}.cmp-shortcut{font-size:9px}}
