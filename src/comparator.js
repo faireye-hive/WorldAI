@@ -177,6 +177,12 @@ export function initComparator(world) {
     }
   }
 
+  document.addEventListener('worldai:actor-added',({detail})=>{
+    const actor=world.actors.get(detail?.id);
+    if(actor && ![...character.options].some(o=>o.value===actor.id)){
+      character.add(new Option(actor.name+' · '+actor.title,actor.id));
+    }
+  });
   refresh.addEventListener('click',updateModels);
   modelA.addEventListener('change',updateButtons);
   modelB.addEventListener('change',updateButtons);
