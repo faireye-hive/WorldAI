@@ -45,7 +45,9 @@ Importe `WorldAIEngine` e mantenha os objetos 3D vinculados aos IDs dos atores. 
 
 O projeto inclui `.github/workflows/pages.yml`. No GitHub, abra **Settings → Pages → Build and deployment** e selecione **GitHub Actions** (se ainda não estiver). Um push na branch `main` executa o build do Vite usando base `/WorldAI/`. URL esperada, após deploy bem-sucedido: `https://faireye-hive.github.io/WorldAI/`.
 
-**Aviso:** não armazenamos os arquivos do modelo (mais de 100 MB) no repositório. O download é sob demanda do Hugging Face. O desempenho depende do hardware e do navegador. WebGPU requer navegador compatível e ambiente seguro (HTTPS ou localhost).
+**Modelo no Pages + cache do navegador:** no deploy, o GitHub Actions baixa automaticamente os arquivos ONNX Q8 (CPU) e Q4F16 (WebGPU) do Hugging Face para `dist/models/v1/` e os inclui no site estático. **Os pesos não são commitados no Git**, pois excedem 100 MB cada. O navegador baixa a variante escolhida do próprio GitHub Pages na primeira utilização e o Transformers.js utiliza Cache Storage nos acessos seguintes, se o navegador permitir e não eliminar o cache. A opção de CPU e a de WebGPU possuem pesos diferentes e podem exigir downloads separados. O modelo ainda precisa ser carregado na RAM a cada abertura.
+
+No modo de desenvolvimento (`npm run dev`), o modelo continua sendo carregado do Hugging Face e também pode ser armazenado em cache, separadamente da versão publicada. O download/espelhamento para o Pages ocorre somente na execução do workflow. Quem quiser testar os arquivos localmente pode usar `bash scripts/fetch-browser-model.sh public/models/v1`, mas evite adicionar pesos ao histórico do Git. O desempenho depende do dispositivo. WebGPU exige navegador compatível e HTTPS/localhost.
 
 ## Testes
 
@@ -58,3 +60,8 @@ MIT.
 ## Motor anterior preservado
 
 O motor original **WorldAI v0.1** foi preservado em [`legacy-v0.1/`](./legacy-v0.1/), incluindo navegação A*, eventos, memória, persistência, adaptador Ollama, testes e a demonstração anterior. O experimento **Living Stories v0.2** usa o núcleo simplificado em `src/world.js`; os dois ainda não foram fundidos. A integração com Tales of Pirates é uma etapa futura.
+
+
+## Futuro: fine-tuning para NPCs
+
+O SmolLM2-135M-Instruct é um ponto de partida experimental, mas foi treinado principalmente para inglês. Para aprimorar português e diálogos de RPG, o caminho é montar um conjunto de exemplos em JSONL, separar treino/validação, ajustar os pesos com PyTorch e Hugging Face Transformers/TRL e, se necessário, LoRA/PEFT. **Não se treina diretamente o arquivo ONNX quantizado**. Depois do treinamento, exportar e quantizar para ONNX, testar CPU/WebGPU e substituir os arquivos publicados. Os resultados precisam ser avaliados no jogo; mesmo ajustado, um modelo 135M pode ser inconsistente. Evite usar diálogos gerados para mudar o estado econômico ou persistente do jogo sem validação.
