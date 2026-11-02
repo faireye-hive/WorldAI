@@ -9,7 +9,7 @@
     <div class="sidebar-footer"><div class="mini-signal">◉ <span>Simulação local ativa</span></div><p>Sem conta. Conversas enviadas somente ao Ollama no seu computador.</p></div>
   </aside>
   <main class="main">
-    <header class="topbar"><div><div class="breadcrumbs">WORLD ENGINE <span>/</span> EXPERIMENTOS <span>/</span> <b>LIVING STORIES</b></div><h1>Um mundo que <em>conversa.</em></h1><p>Clique nos personagens para descobrir suas histórias. Cada um tem sua própria memória.</p></div><div class="top-actions"><div class="time-pill">◷ <span id="world-clock">08:00</span><small id="day-label">DIA</small></div><button type="button" class="icon-button" id="pause" title="Pausar simulação">Ⅱ</button><button type="button" class="icon-button" id="reset" title="Reiniciar memórias">↻</button></div></header>
+    <header class="topbar"><div><div class="breadcrumbs">WORLD ENGINE <span>/</span> EXPERIMENTOS <span>/</span> <b>LIVING STORIES</b></div><h1>Um mundo que <em>conversa.</em></h1><p>Clique nos personagens para descobrir suas histórias. Cada um tem sua própria memória.</p></div><div class="top-actions"><a href="#compare-panel" class="cmp-shortcut">⚖ Comparar IA</a><div class="time-pill">◷ <span id="world-clock">08:00</span><small id="day-label">DIA</small></div><button type="button" class="icon-button" id="pause" title="Pausar simulação">Ⅱ</button><button type="button" class="icon-button" id="reset" title="Reiniciar memórias">↻</button></div></header>
     <div class="game-layout">
       <section class="world-card"><div class="world-card-bar"><div><span class="live-dot"></span><strong>Vila de Aurora</strong><small>Região inicial · Mundo compartilhado</small></div><div class="legend"><span><i class="town"></i> Moradores</span><span><i class="wild"></i> Criaturas</span></div></div><div class="canvas-wrap"><canvas id="world" width="1000" height="620" aria-label="Mapa da vila com personagens clicáveis"></canvas><div class="canvas-top-label">✧ WORLD AI · SIMULAÇÃO AO VIVO</div><div class="canvas-instruction">Clique no personagem para conversar • Clique no chão para andar</div></div><div class="world-toolbar"><span><b id="world-agents">10</b> habitantes <span class="divider">·</span> <b id="world-decisions">0</b> decisões</span><span>⚘ Memória individual <span class="divider">·</span> IA híbrida</span></div></section>
       <section class="story-card" aria-label="Diálogo visual novel"><div class="story-head"><span class="eyebrow">CONVERSA INTERATIVA</span><span class="story-counter" id="story-counter">MEMÓRIA: 0</span></div><div class="portrait-area" id="portrait-area"><div class="portrait-halo"></div><div class="portrait-figure" id="portrait-figure">🧺</div><div class="portrait-tint"></div><div class="character-title"><span class="character-class" id="character-class">COMERCIANTE</span><h2 id="character-name">Lina</h2><span id="character-mood">✦ Bem-humorada, curiosa e falante</span></div></div><div class="speech-area" id="speech-log" role="log" aria-live="polite"></div><div class="dialog-options" id="suggestions"></div><form id="chat-form" class="chat-form"><label class="sr-only" for="chat-input">Sua mensagem</label><input type="text" id="chat-input" maxlength="240" autocomplete="off" placeholder="Converse com o personagem..." required/><button type="submit" id="chat-submit" title="Enviar mensagem">↗</button></form><div class="story-footer"><span id="dialog-source">◆ Diálogos offline de demonstração</span><span id="dialog-feedback"></span></div></section>
@@ -22,6 +22,51 @@
         <div class="ai-description" id="model-state">Inicie o Ollama na porta 11434 e este jogo com npm run dev. Clique para verificar o modelo instalado. Os diálogos offline funcionam mesmo sem conexão.</div>
       </div>
       <p class="privacy-note">ⓘ O jogo envia mensagens ao seu Ollama em 127.0.0.1:11434, através do proxy do Vite (apenas no modo de desenvolvimento local). O site GitHub Pages permanece como demonstração offline. O navegador não baixa modelos ONNX.</p>
+    </section>
+    <section id="compare-panel" class="compare-panel" aria-labelledby="cmp-heading">
+      <header class="cmp-header">
+        <div><span class="cmp-eyebrow">⚖ LABORATÓRIO WORLDAI</span>
+          <h2 id="cmp-heading">Comparador de modelos</h2>
+          <p>Mesma pergunta, mesmo personagem, mesmas configurações. Respostas lado a lado com métricas reais do Ollama.</p>
+        </div>
+        <button id="cmp-refresh" type="button" class="cmp-secondary">↻ Atualizar modelos</button>
+      </header>
+      <div class="cmp-controls">
+        <div class="cmp-model-selectors">
+          <label>Modelo A<select id="cmp-model-a" aria-label="Modelo A"><option value="">Consultando...</option></select></label>
+          <span class="cmp-versus" aria-hidden="true">VS</span>
+          <label>Modelo B<select id="cmp-model-b" aria-label="Modelo B"><option value="">Consultando...</option></select></label>
+        </div>
+        <div class="cmp-actor-row">
+          <label>Personagem<select id="cmp-character" aria-label="Personagem do comparador"></select></label>
+          <button type="button" class="cmp-secondary" id="cmp-fill-selected">Usar NPC selecionado no mapa</button>
+        </div>
+        <label class="cmp-question-label" for="cmp-question">Pergunta do jogador</label>
+        <textarea id="cmp-question" rows="3" maxlength="240" placeholder="Digite uma pergunta que os dois modelos devem responder..."></textarea>
+        <div class="cmp-examples" id="cmp-examples" aria-label="Perguntas prontas"></div>
+        <div class="cmp-actions">
+          <button id="cmp-run" class="cmp-main-button" type="button">⚡ Comparar respostas</button>
+          <button id="cmp-cancel" class="cmp-secondary" type="button" disabled>Cancelar teste</button>
+          <button id="cmp-export" class="cmp-secondary" type="button" disabled>↓ Exportar testes JSON</button>
+        </div>
+        <p class="cmp-status" id="cmp-status" role="status" aria-live="polite">Consulte os modelos disponíveis para começar.</p>
+      </div>
+      <div class="cmp-results">
+        <article class="cmp-card" aria-label="Resposta do modelo A">
+          <div class="cmp-card-header"><div><small>MODELO A</small><h3 id="cmp-title-a">Qwen</h3></div><span class="cmp-flag" id="cmp-flag-a">—</span></div>
+          <p class="cmp-answer" id="cmp-answer-a">Aguardando comparação...</p>
+          <div class="cmp-metrics" id="cmp-metrics-a"></div>
+          <button type="button" id="cmp-vote-a" class="cmp-vote" disabled>★ Prefiro esta resposta</button>
+        </article>
+        <article class="cmp-card" aria-label="Resposta do modelo B">
+          <div class="cmp-card-header"><div><small>MODELO B</small><h3 id="cmp-title-b">LFM3</h3></div><span class="cmp-flag" id="cmp-flag-b">—</span></div>
+          <p class="cmp-answer" id="cmp-answer-b">Aguardando comparação...</p>
+          <div class="cmp-metrics" id="cmp-metrics-b"></div>
+          <button type="button" id="cmp-vote-b" class="cmp-vote" disabled>★ Prefiro esta resposta</button>
+        </article>
+      </div>
+      <p class="cmp-footnote">Testes sequenciais, sem respostas prontas nem tentativas automáticas. A velocidade em tokens/s exclui o carregamento do modelo; o tempo total pode incluir esse carregamento. Nenhuma resposta muda a memória do NPC.</p>
+      <details class="cmp-history"><summary>Histórico de comparações (nesta sessão)</summary><div id="cmp-history"></div></details>
     </section>
     <footer class="page-footer"><span>WORLD<span>AI</span> · ENGINE AGNÓSTICO · PRONTO PARA ADAPTADORES THREE.JS</span><button type="button" id="save-world">↓ Salvar progresso</button></footer>
   </main>
