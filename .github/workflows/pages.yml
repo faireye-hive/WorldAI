@@ -26,9 +26,6 @@ jobs:
       - run: npm run build
         env:
           GITHUB_PAGES: '1'
-      # Download model assets into the generated site. Never commit >100 MB ONNX files.
-      - name: Espelhar modelo de IA no GitHub Pages
-        run: bash scripts/fetch-browser-model.sh "$PWD/dist/models/v1"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
