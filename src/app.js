@@ -114,4 +114,4 @@ editor=initNPCEditor(world,rpg,{
  onAction:outcome=>{if(outcome.ok)save();}
 });
 initComparator(world);
-requestAnimationFrame(frame);setInterval(save,20000);addEventListener('beforeunload',save);
+requestAnimationFrame(frame);setInterval(save,20000);setInterval(()=>editor?.displayBag(),1800);addEventListener('beforeunload',save);
