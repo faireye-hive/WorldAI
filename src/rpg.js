@@ -140,6 +140,7 @@ export class RPGWorld {
    if(stock<quantity)return {ok:false,message:actor.name+' não tem '+quantity+'x '+item.name+' em estoque.'};
    const cost=action==='buy'?item.price*quantity:0;
    if(this.gold<cost)return {ok:false,message:'Você não tem moedas suficientes. Necessário: '+cost+'.'};
+   if(balance+quantity>999)return {ok:false,message:'Sua bolsa atingiu o limite deste item.'};
    this.gold-=cost;this.bag[item.id]=balance+quantity;cfg.stock[item.id]=stock-quantity;
    if(cost)cfg.gold+=cost;
    this.world.remember(actor,'trade',action+': '+quantity+'x '+item.name);
@@ -147,6 +148,7 @@ export class RPGWorld {
   }
   // Selling requires actual player-owned items and NPC spending funds.
   if(balance<quantity)return {ok:false,message:'Você não possui '+quantity+'x '+item.name+'.'};
+  if(stock+quantity>999)return {ok:false,message:'O estoque do NPC está cheio.'};
   const payment=Math.max(1,Math.floor(item.price*0.6))*quantity;
   if(cfg.gold<payment)return {ok:false,message:actor.name+' não tem moedas suficientes para comprar.'};
   cfg.gold-=payment;this.gold+=payment;this.bag[item.id]=balance-quantity;
@@ -173,7 +175,8 @@ export class RPGWorld {
   return {version:1,gold:this.gold,bag:this.bag,escort:this.escort,
    profiles:[...this.profiles].map(([id,p])=>({id,...p,
     custom:id.startsWith('custom-')?(()=>{
-      const a=this.world.actors.get(id);return {x:a.x,y:a.y};})():null
+      const a=this.world.actors.get(id);return {x:a.x,y:a.y,relationship:a.relationship,mood:a.mood,
+       memories:a.memories.slice(-16),history:a.history.slice(-10)};})():null
    }))};
  }
  import(data){
@@ -184,7 +187,12 @@ export class RPGWorld {
     if(!created.ok)continue;
     // custom IDs are kept stable across saved sessions
     this.world.actors.delete(created.actor.id);this.profiles.delete(created.actor.id);
-    created.actor.id=p.id;this.world.actors.set(p.id,created.actor);
+    created.actor.id=p.id;
+    created.actor.relationship=Number(p.custom.relationship)||0;
+    created.actor.mood=Number.isFinite(Number(p.custom.mood))?Number(p.custom.mood):70;
+    created.actor.memories=Array.isArray(p.custom.memories)?p.custom.memories.slice(-16):[];
+    created.actor.history=Array.isArray(p.custom.history)?p.custom.history.slice(-10):[];
+    this.world.actors.set(p.id,created.actor);
    }
    if(this.world.actors.has(p.id))this.setProfile(p.id,p);
   }
