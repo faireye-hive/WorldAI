@@ -68,8 +68,10 @@ export function extractNPCReply(result, question) {
   let raw = Array.isArray(result) ? result[0]?.generated_text : result?.generated_text;
   if (Array.isArray(raw)) {
     // Some APIs return the whole chat; NEVER take the last user message.
-    const assistant = raw.findLast(message => message?.role === "assistant");
-    if (!assistant) throw new Error("A IA não gerou uma mensagem de NPC.");
+    // The final turn MUST be the new assistant message. An older assistant turn
+    // from chat history is not a response to the latest player question.
+    const assistant = raw.at(-1);
+    if (assistant?.role !== "assistant") throw new Error("A IA não gerou uma mensagem de NPC.");
     raw = assistant.content;
   }
   if (Array.isArray(raw)) {
