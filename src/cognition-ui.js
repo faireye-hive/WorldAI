@@ -60,30 +60,34 @@ export function initCognition({world,social,modelName,isConnected,save}){
       try{
         if(planned.review){
           report('Avaliando resposta de '+actor.name+'… ('+jobs+' na fila)');
-          const verdict=await reviewDialogue(context,current,{model});
-          const desc='Nota de adequação '+verdict.score+'/5: '+verdict.reason;
-          last.textContent=desc;
-          if(!verdict.adequate && planned.rewrite){
-            report('Tentando melhorar resposta de '+actor.name+'…');
-            try{
-              const improved=await rewriteDialogue(context,current,verdict,{model});
-              if(improved&&responseEntry?.content===current&&actor.history.includes(responseEntry)){
-                responseEntry.content=improved;
-                if(memoryEntry&&actor.memories.includes(memoryEntry)){
-                  memoryEntry.data=(question+' → '+improved).slice(0,160);
+          try{
+            const verdict=await reviewDialogue(context,current,{model});
+            const desc='Nota de adequação '+verdict.score+'/5: '+verdict.reason;
+            last.textContent=desc;
+            if(!verdict.adequate && planned.rewrite){
+              report('Tentando melhorar resposta de '+actor.name+'…');
+              try{
+                const improved=await rewriteDialogue(context,current,verdict,{model});
+                if(improved&&responseEntry?.content===current&&actor.history.includes(responseEntry)){
+                  responseEntry.content=improved;
+                  if(memoryEntry&&actor.memories.includes(memoryEntry)){
+                    memoryEntry.data=(question+' → '+improved).slice(0,160);
+                  }
+                  if(speechNode?.isConnected){
+                    const body=speechNode.querySelector('div');
+                    if(body)body.textContent=improved;
+                    speechNode.classList.add('npc-revised');
+                  }
+                  current=improved;
+                  last.textContent=desc+' · Revisão aplicada: '+improved.slice(0,150);
+                  save();
                 }
-                if(speechNode?.isConnected){
-                  const body=speechNode.querySelector('div');
-                  if(body)body.textContent=improved;
-                  speechNode.classList.add('npc-revised');
-                }
-                current=improved;
-                last.textContent=desc+' · Revisão aplicada: '+improved.slice(0,150);
-                save();
+              }catch(err){
+                last.textContent=desc+' · A revisão falhou: '+asText(err.message).slice(0,90);
               }
-            }catch(err){
-              last.textContent=desc+' · A tentativa de revisão falhou: '+asText(err.message).slice(0,90);
             }
+          }catch(err){
+            last.textContent='Avaliação indisponível: '+asText(err.message).slice(0,100);
           }
         }
         if(planned.reflect){
@@ -111,5 +115,5 @@ export function initCognition({world,social,modelName,isConnected,save}){
   }
 
   render();
-  return {render,afterDialogue:runDialogueLab,mark:actor=>{social.markConversation(actor.id);render(actor.id);}};
+  return {render,afterDialogue:runDialogueLab,mark:actor=>{social.markConversation(actor.id);if(world.selectedId===actor.id)render(actor.id);}};
 }
