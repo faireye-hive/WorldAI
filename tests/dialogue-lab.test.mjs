@@ -98,7 +98,9 @@ test('avaliador usa contexto, identifica erro e devolve nota',async()=>{
    return okay({adequate:true,score:4,reason:'Respondeu com o NPC',improvement:''});
   }
  });
- assert.equal(body.format,'json');
+ assert.equal(body.format.type,'object');
+ assert.ok(body.format.required.includes('adequate'));
+ assert.ok(body.options.num_predict>=300);
  assert.equal(body.stream,false);
  assert.equal(body.think,false);
  assert.equal(result.adequate,true);
