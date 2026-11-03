@@ -36,12 +36,23 @@ export function buildNPCMessages(data, retry = false) {
   const memories = (Array.isArray(data.memories) ? data.memories : [])
     .filter(item => item && item.type !== "conversation")
     .slice(-2).map(item => short(item.data, 90));
+  const stock=Array.isArray(data.inventory)?data.inventory:[];
+  const vendors=Array.isArray(data.vendors)?data.vendors:[];
+  const knownCatalog=Array.isArray(data.catalog)?data.catalog:[];
+  const species=data.species||'human';
   const system = [
     "You are " + name + ", a " + job + " in Vila Aurora, a fantasy village.",
     "Your personality: " + personality + ".",
+    "Species: " + species + ". You must stay consistent with your identity and profession.",
+    "The PLAYER is a different character from you. Never confuse the player with " + name + ".",
     "Answer as this character in natural Brazilian Portuguese, using one or two short sentences.",
     "Respond to what the player said; do not repeat or quote their question.",
     "Never invent items, rewards, money, completed quests or changes to game state.",
+    "Keep continuity with the player's previous messages. Answer the CURRENT request first.",
+    "If asked for an unavailable product, say it is NOT in stock; do not imply any shop has it.",
+    "Do not claim that you have already helped, delivered, crafted, escorted or prepared something unless confirmed in the game.",
+    "Do not put prices in Brazilian reais: use game moedas only.",
+    "A character's promises or guesses do not create world facts.",
     "Time: " + time + ".",
     data.social ? "NPC simulated opinion of visitor: " + short(data.social.opinion,140) +
       ". Emotional stance: " + short(data.social.feeling,20) +
@@ -52,25 +63,33 @@ export function buildNPCMessages(data, retry = false) {
     "Character background: " + short(data.description, 260) + ".",
     "World facts: Vila Aurora contains " + (Array.isArray(data.knownPlaces) ? data.knownPlaces.map(p=>p.name).slice(0,8).join(", ") : "a small village") + ".",
     "Allowed interactions: " + (Array.isArray(data.allowedActions) ? data.allowedActions.join(", ") : "none") + ".",
-    "Real available stock: " + (Array.isArray(data.inventory) ? JSON.stringify(data.inventory).slice(0,220) : "none") + ".",
+    "YOUR CURRENT STOCK: " + (stock.length ? stock.map(i=>i.name+" x"+i.stock+" ("+i.price+" moedas)").join(", ") : "nothing available") + ".",
+    "Existing item catalog: " + (knownCatalog.length?knownCatalog.map(i=>i.name).join(", "):"use only real items in your own inventory") + ".",
+    "Shop directory: " + (vendors.length?vendors.map(v=>v.name+" ("+v.role+"): "+v.items.join(", ")).join("; ").slice(0,360):"unknown") + ".",
+    "WEAPONS AND ARMOR: not present in the current catalog, do not claim they are available anywhere.",
     "Only the game engine can move, trade, give items or change money; never claim an action completed unless confirmed.",
     memories.length ? "Known events: " + memories.join("; ") + "." : "",
     retry ? "IMPORTANT: Do not echo the player. Add a relevant new fact from your profession or the village." : ""
   ].filter(Boolean).join(" ");
 
   const turns = [{ role: "system", content: system }];
-  // Keep at most ONE previous valid dialogue exchange; ignore saved echoes,
-  // otherwise a broken conversation teaches the model to keep echoing.
+  // Preserve the last three valid exchanges in chronological order; a
+  // single exchange loses antecedents such as "uma armadura" -> "uma".
+  // Reject echoed assistant messages so they don't contaminate the prompt.
   const history = Array.isArray(data.history) ? data.history.slice(-10) : [];
-  for (let i = history.length - 2; i >= 0; i--) {
-    const user = history[i], assistant = history[i + 1];
+  const pairs=[];
+  for (let i = 0; i < history.length - 1; i++) {
+    const user = history[i], assistant = history[i+1];
     if (user?.role === "user" && assistant?.role === "assistant" &&
         !isEcho(assistant.content, user.content)) {
-      turns.push({ role: "user", content: short(user.content, 160) });
-      turns.push({ role: "assistant", content: short(assistant.content, 220) });
-      break;
+      pairs.push([
+        { role: "user", content: short(user.content, 190) },
+        { role: "assistant", content: short(assistant.content, 240) }
+      ]);
+      i++;
     }
   }
+  for(const pair of pairs.slice(-3))turns.push(...pair);
   turns.push({ role: "user", content: short(data.question, 240) });
   return turns;
 }
