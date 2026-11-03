@@ -3,12 +3,12 @@ import {DEFAULT_MODEL,checkOllama,askOllama} from './ollama.js';
 import {initComparator} from './comparator.js';
 import {RPGWorld,PLACES} from './rpg.js';
 import {initNPCEditor} from './npc-editor.js';
-import {detectIntent,decideNPCAction} from './npc-actions.js';
+import {detectIntent,decideNPCAction,completePendingIntent} from './npc-actions.js';
 import {SocialMemory} from './social.js';
 import {initCognition} from './cognition-ui.js';
 const $=id=>document.getElementById(id);
 const world=new WorldAIEngine();const rpg=new RPGWorld(world);const social=new SocialMemory(world);const canvas=$('world'),ctx=canvas.getContext('2d');
-const state={ready:false,loading:false,busy:false,decisions:0,lastSelected:null,toastUntil:0};
+const state={ready:false,loading:false,busy:false,decisions:0,lastSelected:null,toastUntil:0,pendingRequest:null};
 const hints=['Olá, tudo bem?','Como você se chama?','Você precisa de ajuda?','Conhece algum segredo?'];
 const emojiColors={smith:'#d09e71',merchant:'#b5a2e4',herbalist:'#9dcdb5',guard:'#91b2db',innkeeper:'#dbb69a',wolf:'#a8bccc',deer:'#d2b58f',boar:'#c1a48e'};
 const mapTrees=Array.from({length:43},(_,i)=>{const rnd=n=>((Math.sin(i*127.1+n*51.3)*43758.5453)%1+1)%1;return {x:615+rnd(1)*350,y:55+rnd(2)*520,s:13+rnd(3)*15}});
@@ -64,13 +64,30 @@ async function requestAI(actor,question){
  return askOllama(context,{model:$('model-name').value.trim()||DEFAULT_MODEL});
 }
 async function sendMessage(text){text=String(text).trim();if(!text||state.busy)return;const a=world.selected;if(!a)return;const analysisContext={...world.getConversationContext(a),question:text};state.busy=true;$('chat-submit').disabled=true;$('chat-input').disabled=true;for(const b of $('suggestions').querySelectorAll('button'))b.disabled=true;$('chat-input').value='';const userMsg=appendMessage('user','VOCÊ',text);const busy=appendMessage('npc',a.name,'Pensando...');busy.classList.add('pending');let reply,mode='script';try{
-  const intent=detectIntent(text);
-  if(intent){
-    const decision=state.ready?await decideNPCAction(text,a,rpg,{model:$('model-name').value.trim()||DEFAULT_MODEL}):{proposal:intent,mode:'rules'};
-    const outcome=rpg.perform(a.id,decision.proposal||intent);
-    reply=outcome.message;mode='action-'+decision.mode;
-    editor?.displayBag();
-    editor?.showMessage(outcome.message);
+  const direct=detectIntent(text);
+  const prior=state.pendingRequest?.expiresAt>Date.now()?state.pendingRequest:null;
+  const continuation=direct?null:completePendingIntent(text,prior,a.id);
+  const intent=direct||(continuation?.cancelled?null:continuation);
+  if(continuation?.cancelled){
+    state.pendingRequest=null;
+    reply='Certo, não faremos nenhuma transação.';mode='clarify';
+  }else if(intent){
+    // Clarify incomplete requests before making any change to inventory or gold.
+    const decision=await decideNPCAction(text,a,rpg,{
+      model:$('model-name').value.trim()||DEFAULT_MODEL,
+      intentOverride:intent,
+      // When offline, the local intent recognizer still handles known requests.
+      fetchImpl:state.ready?fetch:async()=>({ok:false})
+    });
+    if(decision.mode==='clarify'){
+      reply=decision.message;mode='clarify';
+      state.pendingRequest={actorId:a.id,action:intent.action,expiresAt:Date.now()+90000};
+    }else{
+      state.pendingRequest=null;
+      const outcome=rpg.perform(a.id,decision.proposal||intent);
+      reply=outcome.message;mode='action-'+decision.mode;
+      editor?.displayBag();editor?.showMessage(outcome.message);
+    }
   }else if(state.ready){
     mode='ollama';
     try{reply=await requestAI(a,text);}catch(err){
