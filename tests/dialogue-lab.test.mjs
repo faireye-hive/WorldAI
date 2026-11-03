@@ -109,9 +109,9 @@ test('avaliador usa contexto, identifica erro e devolve nota',async()=>{
 test('reflexão usa JSON limitado e não altera mundo diretamente',async()=>{
  const {world,rpg,social}=fixture();
  let calls=0;
- const insight=await reflectOnConversation(context,'A praça fica ao centro.',{
+ const insight=await reflectOnConversation({...context,question:'Obrigado por me ajudar, Lina.'},'A praça fica ao centro.',{
   model:'lfm3:latest',fetchImpl:async()=>{
-   calls++;return okay({opinion:'É um viajante curioso',insight:'Perguntou sobre a praça',
+   calls++;return okay({opinion:'O visitante demonstrou gratidão pela ajuda',insight:'Agradeceu a Lina',
     feeling:'curioso',trustChange:12,opennessChange:4,patienceChange:-3});
   }
  });
