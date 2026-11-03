@@ -6,8 +6,22 @@ import {initNPCEditor} from './npc-editor.js';
 import {detectIntent,decideNPCAction,completePendingIntent} from './npc-actions.js';
 import {SocialMemory} from './social.js';
 import {initCognition} from './cognition-ui.js';
+import {DialogueRecorder} from './dialogue-recorder.js';
+import {initHistoryUI} from './history-ui.js';
 const $=id=>document.getElementById(id);
 const world=new WorldAIEngine();const rpg=new RPGWorld(world);const social=new SocialMemory(world);const canvas=$('world'),ctx=canvas.getContext('2d');
+const sessionId=(()=>{
+  try{
+    let id=sessionStorage.getItem('worldai-debug-session');
+    if(!id){id=globalThis.crypto?.randomUUID?.()||('worldai-'+Date.now()+'-'+Math.random().toString(36).slice(2));sessionStorage.setItem('worldai-debug-session',id);}
+    return id;
+  }catch{return 'worldai-'+Date.now()+'-'+Math.random().toString(36).slice(2);}
+})();
+const recorder=new DialogueRecorder({sessionId});
+let historyUI=null,turnSequence=0;
+function logEvent(event){recorder.record(event).catch(()=>{});historyUI?.refreshSoon();}
+logEvent({type:'session_started',text:'Jogo carregado ou recarregado',details:{appVersion:'0.7',url:location.pathname,agent:navigator.userAgent}});
+
 const state={ready:false,loading:false,busy:false,decisions:0,lastSelected:null,toastUntil:0,pendingRequest:null};
 const hints=['Olá, tudo bem?','Como você se chama?','Você precisa de ajuda?','Conhece algum segredo?'];
 const emojiColors={smith:'#d09e71',merchant:'#b5a2e4',herbalist:'#9dcdb5',guard:'#91b2db',innkeeper:'#dbb69a',wolf:'#a8bccc',deer:'#d2b58f',boar:'#c1a48e'};
@@ -59,11 +73,24 @@ if(import.meta.env.PROD){
  $('load-model').textContent='Disponível na versão local';
  setAIStatus('MODO ROTEIRO','off','Para conversar usando o seu Ollama, execute este projeto via npm run dev no computador com o modelo instalado.');
 }
-async function requestAI(actor,question){
- const context={...world.getConversationContext(actor),question};
- return askOllama(context,{model:$('model-name').value.trim()||DEFAULT_MODEL});
+async function requestAI(actor,question,turnId,context){
+ const model=$('model-name').value.trim()||DEFAULT_MODEL;
+ return askOllama(context||{...world.getConversationContext(actor),question},{
+  model,onTrace:entry=>logEvent({
+   type:entry.type==='error'?'model_error':'model_attempt',
+   actorId:actor.id,actorName:actor.name,turnId,model,
+   text:entry.text||entry.error||'Tentativa de inferência',
+   details:{attempt:entry.attempt,elapsedMs:entry.elapsedMs,
+     status:entry.status,evalCount:entry.evalCount,doneReason:entry.doneReason}
+  })
+ });
 }
-async function sendMessage(text){text=String(text).trim();if(!text||state.busy)return;const a=world.selected;if(!a)return;const analysisContext={...world.getConversationContext(a),question:text};state.busy=true;$('chat-submit').disabled=true;$('chat-input').disabled=true;for(const b of $('suggestions').querySelectorAll('button'))b.disabled=true;$('chat-input').value='';const userMsg=appendMessage('user','VOCÊ',text);const busy=appendMessage('npc',a.name,'Pensando...');busy.classList.add('pending');let reply,mode='script';try{
+async function sendMessage(text){text=String(text).trim();if(!text||state.busy)return;const a=world.selected;if(!a)return;const analysisContext={...world.getConversationContext(a),question:text};
+ const turnId=sessionId+'-'+(++turnSequence);
+ const model=state.ready?($('model-name').value.trim()||DEFAULT_MODEL):'offline';
+ logEvent({type:'user_message',actorId:a.id,actorName:a.name,turnId,model,
+   text,details:{worldTime:world.clock,context:analysisContext}});
+ state.busy=true;$('chat-submit').disabled=true;$('chat-input').disabled=true;for(const b of $('suggestions').querySelectorAll('button'))b.disabled=true;$('chat-input').value='';const userMsg=appendMessage('user','VOCÊ',text);const busy=appendMessage('npc',a.name,'Pensando...');busy.classList.add('pending');let reply,mode='script';try{
   const direct=detectIntent(text);
   const prior=state.pendingRequest?.expiresAt>Date.now()?state.pendingRequest:null;
   const continuation=direct?null:completePendingIntent(text,prior,a.id);
@@ -82,22 +109,37 @@ async function sendMessage(text){text=String(text).trim();if(!text||state.busy)r
     if(decision.mode==='clarify'){
       reply=decision.message;mode='clarify';
       state.pendingRequest={actorId:a.id,action:intent.action,expiresAt:Date.now()+90000};
+      logEvent({type:'action',actorId:a.id,actorName:a.name,turnId,model,mode,
+        text:'Pedido incompleto — aguardando esclarecimento',details:{intent,decisionMode:decision.mode}});
     }else{
       state.pendingRequest=null;
       const outcome=rpg.perform(a.id,decision.proposal||intent);
       reply=outcome.message;mode='action-'+decision.mode;
+      logEvent({type:'action',actorId:a.id,actorName:a.name,turnId,model,mode,
+        text:outcome.message,details:{intent,proposal:decision.proposal,success:outcome.ok,
+          goldAfter:rpg.gold,bagAfter:{...rpg.bag}}});
       editor?.displayBag();editor?.showMessage(outcome.message);
     }
   }else if(state.ready){
     mode='ollama';
-    try{reply=await requestAI(a,text);}catch(err){
+    try{reply=await requestAI(a,text,turnId,analysisContext);}catch(err){
+      logEvent({type:'model_error',actorId:a.id,actorName:a.name,turnId,model,text:String(err.message||err),level:'error'});
       reply=world.scriptedReply(a,text);mode='fallback';
       $('dialog-feedback').textContent='Ollama: '+String(err.message).slice(0,170)+' — diálogo de roteiro.';
     }
   }else reply=world.scriptedReply(a,text);
   world.interact(a,text,reply,mode);const responseEntry=a.history.at(-1),memoryEntry=a.memories.at(-1);social.markConversation(a.id);if(world.selectedId===a.id)cognition?.render(a.id);busy.remove();
   const responseNode=world.selectedId===a.id?appendMessage('npc',a.name,reply):null;if(world.selectedId===a.id)$('story-counter').textContent='MEMÓRIA: '+a.memories.length;save();
-  cognition?.afterDialogue({actor:a,question:text,reply,mode,context:analysisContext,speechNode:responseNode,responseEntry,memoryEntry});}finally{state.busy=false;$('chat-submit').disabled=false;$('chat-input').disabled=false;for(const b of $('suggestions').querySelectorAll('button'))b.disabled=false;$('chat-input').focus();}}
+  logEvent({type:'npc_message',actorId:a.id,actorName:a.name,turnId,model,mode,text:reply,
+    details:{worldTime:world.clock,conversationLength:a.history.length}});
+  cognition?.afterDialogue({actor:a,question:text,reply,mode,context:analysisContext,speechNode:responseNode,responseEntry,memoryEntry,turnId});
+ }catch(err){
+   busy.remove();
+   const message='Falha no processamento: '+String(err.message||err).slice(0,180);
+   if(world.selectedId===a.id)appendMessage('npc',a.name,message);
+   logEvent({type:'model_error',actorId:a.id,actorName:a.name,turnId,model,
+     text:message,level:'error'});
+ }finally{state.busy=false;$('chat-submit').disabled=false;$('chat-input').disabled=false;for(const b of $('suggestions').querySelectorAll('button'))b.disabled=false;$('chat-input').focus();}}
 $('chat-form').addEventListener('submit',e=>{e.preventDefault();sendMessage($('chat-input').value);});$('pause').addEventListener('click',()=>{world.paused=!world.paused;$('pause').textContent=world.paused?'▶':'Ⅱ';});$('reset').addEventListener('click',()=>{if(!confirm('Reiniciar o mundo e apagar conversas salvas?'))return;localStorage.removeItem('worldai-story-save');localStorage.removeItem('worldai-rpg-save');localStorage.removeItem('worldai-social-save');location.reload();});$('save-world').addEventListener('click',()=>{save();$('save-world').textContent='✓ Salvo';setTimeout(()=>$('save-world').textContent='↓ Salvar progresso',1600);});
 function polygon(points,fill){ctx.beginPath();ctx.moveTo(points[0][0],points[0][1]);for(let i=1;i<points.length;i++)ctx.lineTo(points[i][0],points[i][1]);ctx.closePath();ctx.fillStyle=fill;ctx.fill();}
 function rounded(x,y,w,h,r,fill){ctx.fillStyle=fill;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();}
@@ -134,6 +176,12 @@ editor=initNPCEditor(world,rpg,{
  onAdded:a=>{all.push(a);renderActors();renderConversation();save();},
  onAction:outcome=>{if(outcome.ok)save();}
 });
-initComparator(world);
-cognition=initCognition({world,social,modelName:()=>$('model-name').value.trim()||DEFAULT_MODEL,isConnected:()=>state.ready,save});
+initComparator(world,{onCompared:record=>logEvent({
+  type:'compare',model:record.models?.join(' vs '),actorId:record.characterId,
+  actorName:record.character,text:record.question,
+  details:{results:record.results,winner:record.winner,context:record.context}
+})});
+cognition=initCognition({world,social,modelName:()=>$('model-name').value.trim()||DEFAULT_MODEL,
+ isConnected:()=>state.ready,save,logEvent});
+historyUI=initHistoryUI({recorder,world});
 requestAnimationFrame(frame);setInterval(save,20000);setInterval(()=>editor?.displayBag(),1800);addEventListener('beforeunload',save);
