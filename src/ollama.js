@@ -41,13 +41,15 @@ export function makeOllamaRequest(context, model = DEFAULT_MODEL, retry = false)
   };
 }
 
-export async function askOllama(context, { fetchImpl = fetch, model = DEFAULT_MODEL, timeoutMs = 90000 } = {}) {
+export async function askOllama(context, { fetchImpl = fetch, model = DEFAULT_MODEL, timeoutMs = 90000, onTrace = () => {} } = {}) {
   const question = String(context?.question || '').trim();
   if (!question) throw new Error('Pergunta vazia.');
   let lastError;
   for (let attempt = 0; attempt < 2; attempt++) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const started=Date.now();
+    const trace=event=>{try{onTrace({attempt:attempt+1,elapsedMs:Date.now()-started,...event});}catch{}};
     try {
       const response = await scheduleOllama(()=>fetchImpl(endpoint('/chat'), {
         method: 'POST',
@@ -57,16 +59,19 @@ export async function askOllama(context, { fetchImpl = fetch, model = DEFAULT_MO
       }),{priority:'foreground',signal:controller.signal});
       if (!response.ok) {
         const raw = await response.text();
-        throw new Error('Ollama HTTP ' + response.status + ': ' + raw.slice(0, 160));
+        throw new Error('Ollama HTTP ' + response.status + ': ' + raw.slice(0, 400));
       }
       const data = await response.json();
       const content = data?.message?.content;
+      trace({type:'response',text:typeof content==='string'?content:'',
+        status:response.status,evalCount:data?.eval_count,doneReason:data?.done_reason});
       if (typeof content !== 'string' || !content.trim()) {
         throw new Error('O modelo não retornou texto. Verifique a configuração de thinking.');
       }
       const reply = extractNPCReply([{ generated_text: content }], question);
       return reply.slice(0, TEXT_LIMIT);
     } catch (err) {
+      trace({type:'error',error:String(err.message||err),status:null});
       lastError = err;
       if (err.name === 'AbortError') throw new Error('Ollama demorou demais para responder.');
       if (err instanceof TypeError) {
