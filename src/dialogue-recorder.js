@@ -65,8 +65,9 @@ function promiseRequest(req){
   });
 }
 export class DialogueRecorder{
-  constructor({indexedDBImpl=globalThis.indexedDB,sessionId,onStatus=()=>{}}={}){
+  constructor({indexedDBImpl=globalThis.indexedDB,dbName=LOG_DB_NAME,sessionId,onStatus=()=>{}}={}){
     this.indexedDBImpl=indexedDBImpl;
+    this.dbName=dbName;
     this.sessionId=sessionId||('session-'+Date.now()+'-'+Math.random().toString(36).slice(2,9));
     this.onStatus=onStatus;this._dbPromise=null;this._queue=Promise.resolve();
     this.saved=0;this.failed=0;this.lastError=null;
@@ -75,7 +76,7 @@ export class DialogueRecorder{
     if(!this.indexedDBImpl)throw Error('IndexedDB indisponível neste navegador.');
     if(this._dbPromise)return this._dbPromise;
     this._dbPromise=new Promise((resolve,reject)=>{
-      const req=this.indexedDBImpl.open(LOG_DB_NAME,LOG_DB_VERSION);
+      const req=this.indexedDBImpl.open(this.dbName,LOG_DB_VERSION);
       req.onupgradeneeded=()=>{
         const db=req.result;
         if(!db.objectStoreNames.contains(LOG_STORE)){
