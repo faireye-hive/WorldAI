@@ -123,3 +123,30 @@ button:disabled{opacity:.5}
 .social-events li small{color:#90a5c7;font-size:10px}
 .social-events li span{color:#d8dfed;font-size:11px;line-height:1.4;overflow-wrap:anywhere}
 .message.npc-revised{border-color:#86c8ac;background:#25423d}
+
+
+/* v0.7 — histórico durável e exportação para auditoria */
+.history-panel{margin-top:18px;border:1px solid #3d4866;background:#131c32;border-radius:18px;padding:22px}
+.history-header{display:flex;justify-content:space-between;gap:15px;align-items:start;flex-wrap:wrap}
+.history-header h2{font:normal 27px/1.12 'DM Serif Display',serif;margin:8px 0;color:#fff4ff}
+.history-header p{max-width:740px;color:#9aabc7;font-size:12px;line-height:1.6;margin:0}
+.history-counter{padding:13px 18px;border:1px solid #4e597a;border-radius:12px;background:#202c46;text-align:center;display:flex;flex-direction:column;gap:4px}
+.history-counter strong{font-size:26px;line-height:1;color:#c6b5fa;font-variant-numeric:tabular-nums}
+.history-counter span{font-size:10px;color:#a4afc4}
+.history-controls{margin-top:19px;display:flex;gap:10px;align-items:end;flex-wrap:wrap}
+.history-filter-label{display:flex;flex-direction:column;gap:7px;color:#bbc8df;font-weight:700;font-size:11px}
+.history-filter-label select{min-width:175px;max-width:100%;border:1px solid #495478;background:#1b2743;color:#e8e9f8;padding:11px;border-radius:9px}
+.history-session-label{display:flex;align-items:center;gap:7px;color:#b9c5dc;font-size:11px;margin:0 8px 12px 0}
+.history-session-label input{accent-color:#bb9ff0}
+.history-danger{margin-left:auto;color:#f3b9b9;border-color:#75546a}
+.history-status{margin:14px 0 0;color:#c0d7be;font-size:11px;line-height:1.5}
+.history-status[data-health=error]{color:#ffb0ab}
+.history-preview-box{margin-top:16px;border-top:1px solid #343e58;padding-top:14px}
+.history-preview-box summary{font-size:11px;font-weight:700;cursor:pointer;color:#d4c8f7}
+.history-preview{display:grid;gap:8px;max-height:330px;overflow:auto;margin-top:10px}
+.history-entry{border:1px solid #323f60;border-radius:10px;background:#1a2742;padding:10px}
+.history-entry small{color:#a8b9d0;font-size:10px}
+.history-entry p{color:#eef1fc;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;font-size:12px;margin:7px 0 0}
+.history-privacy{font-size:11px;color:#9aacbf;line-height:1.65;margin:14px 0 0}
+.history-privacy strong{color:#e5cbbf}
+@media(max-width:620px){.history-panel{padding:13px}.history-controls>*{flex:1 1 100%}.history-filter-label select{width:100%}.history-danger{margin-left:0}.history-counter{flex:1 1 100%}}
