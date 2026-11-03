@@ -3,7 +3,7 @@ import {DEFAULT_MODEL,checkOllama,askOllama} from './ollama.js';
 import {initComparator} from './comparator.js';
 import {RPGWorld,PLACES} from './rpg.js';
 import {initNPCEditor} from './npc-editor.js';
-import {detectIntent,decideNPCAction,completePendingIntent} from './npc-actions.js';
+import {detectIntent,decideNPCAction,completePendingIntent,unavailableGoods,unavailableItemReply} from './npc-actions.js';
 import {SocialMemory} from './social.js';
 import {initCognition} from './cognition-ui.js';
 import {DialogueRecorder} from './dialogue-recorder.js';
@@ -123,7 +123,14 @@ async function sendMessage(text){text=String(text).trim();if(!text||state.busy)r
   const prior=state.pendingRequest?.expiresAt>Date.now()?state.pendingRequest:null;
   const continuation=direct?null:completePendingIntent(text,prior,a.id);
   const intent=direct||(continuation?.cancelled?null:continuation);
-  if(continuation?.cancelled){
+  const wantsUnavailable=unavailableGoods(text).length &&
+    ((direct?.action==='buy')||(prior?.actorId===a.id&&prior.action==='buy'));
+  if(wantsUnavailable){
+    state.pendingRequest=null;
+    reply=unavailableItemReply(a,rpg,text);mode='unavailable';
+    logEvent({type:'action',actorId:a.id,actorName:a.name,turnId,model,mode,
+      text:reply,details:{unsupported:unavailableGoods(text),success:false}});
+  }else if(continuation?.cancelled){
     state.pendingRequest=null;
     reply='Certo, não faremos nenhuma transação.';mode='clarify';
   }else if(intent){
@@ -134,7 +141,12 @@ async function sendMessage(text){text=String(text).trim();if(!text||state.busy)r
       // When offline, the local intent recognizer still handles known requests.
       fetchImpl:state.ready?fetch:async()=>({ok:false})
     });
-    if(decision.mode==='clarify'){
+    if(decision.mode==='unavailable'){
+      state.pendingRequest=null;
+      reply=decision.message;mode='unavailable';
+      logEvent({type:'action',actorId:a.id,actorName:a.name,turnId,model,mode,
+        text:reply,details:{unsupported:unavailableGoods(text),success:false}});
+    }else if(decision.mode==='clarify'){
       reply=decision.message;mode='clarify';
       state.pendingRequest={actorId:a.id,action:intent.action,expiresAt:Date.now()+90000};
       logEvent({type:'action',actorId:a.id,actorName:a.name,turnId,model,mode,
@@ -148,6 +160,11 @@ async function sendMessage(text){text=String(text).trim();if(!text||state.busy)r
           goldAfter:rpg.gold,bagAfter:{...rpg.bag}}});
       editor?.displayBag();editor?.showMessage(outcome.message);
     }
+  }else if(a.species!=='human'&&!rpg.profile(a.id)?.canSpeak){
+    // Ordinary wildlife reacts non-verbally. A magical speaking animal can
+    // be enabled explicitly in the editor.
+    reply=world.scriptedReply(a,text);
+    mode='creature';
   }else if(state.ready){
     mode='ollama';
     try{reply=await requestAI(a,text,turnId,analysisContext);}catch(err){
