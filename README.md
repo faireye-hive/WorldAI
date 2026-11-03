@@ -1,6 +1,29 @@
-# WorldAI — Living Stories v0.5 (NPC editor + ações RPG)
+# WorldAI — Living Stories v0.6 (memória social e revisão automática)
 
 Laboratório de NPCs para futura integração com **Tales of Pirates / Three.js**. Inclui vila 2D, **cinco habitantes com conversas**, cinco criaturas com decisões por regras, relações, memória e salvamento. O chat agora usa o **Ollama + LFM3 ou Qwen3.5**, executado no **seu próprio computador**. Não é necessário baixar modelos no navegador, nem configurar CORS.
+
+## 🧠 Memória social, revisão de respostas e personalidade dinâmica (v0.6)
+
+No painel de conversa há uma nova seção **“O que [NPC] pensa de você”**. Ela apresenta **interpretações narrativas fictícias** produzidas pelo Ollama, não pensamentos ocultos reais nem fatos sobre a pessoa que joga. Por personagem:
+
+- **Opinião atual** e impressão mais recente sobre o visitante.
+- **Confiança**, **abertura** e **paciência** em uma escala de 0 a 100.
+- **Familiaridade** (quantas conversas já tiveram) e histórico das quatro interpretações mais recentes.
+- **Limpar opinião deste NPC**, sem apagar o histórico do chat. Os estados sociais são separados e persistidos em `localStorage`.
+
+O motor envia a opinião e os traços atuais como parte do contexto nos próximos turnos. O NPC pode responder de forma mais cautelosa ou aberta; a abertura também influencia discretamente sua escolha entre observar e socializar durante o passeio. A profissão, permissões de comércio, inventário e economia continuam sob controle do motor.
+
+Em **Ollama local**, há três opções independentes para experimentos:
+
+1. **Avaliar respostas após enviá-las**: depois que o NPC fala, uma chamada JSON separada tenta avaliar relevância, fidelidade à personagem e repetição. O resultado mostra nota estimada (0–5) e motivo. Não é uma medida objetiva do que o jogador realmente queria.
+2. **Corrigir resposta inadequada**: se a avaliação marcar problema, há **no máximo uma nova geração**. O texto exibido é atualizado, marcado visualmente, e a mensagem correspondente na memória de conversa também é corrigida.
+3. **Atualizar opinião e personalidade**: uma chamada separada pede um resumo narrativo da interação, com opinião, impressão e ajustes de confiança (máximo ±3), abertura e paciência (máximo ±2). Conversas neutras normalmente não devem aumentar a confiança.
+
+As análises **rodam em uma fila assíncrona no navegador, enquanto a aba estiver aberta**: não travam o envio da próxima mensagem e limitam quantas conversas ficam aguardando para evitar saturar o processador. Se o avaliador falhar, o diálogo permanece, e a reflexão pode continuar independentemente. **Ações de comércio e guia não são reescritas nem reavaliadas**: a confirmação dessas ações vem somente do motor.
+
+**Custo e limitações:** com as três opções ativadas, cada diálogo com Ollama pode fazer até **três requisições** (gerar, avaliar e refletir), ou **quatro quando há revisão**. Modelos pequenos podem avaliar erroneamente a qualidade ou inventar interpretações; use os controles para comparar o resultado com e sem revisão. Não é treinamento dos pesos e não envolve cadeia interna de raciocínio do modelo. Nada roda depois que o navegador fecha. O GitHub Pages continua em modo roteiro, sem Ollama.
+
+Arquivos: `src/social.js` (memória social persistente), `src/dialogue-lab.js` (juiz/revisão/reflexão), `src/cognition-ui.js` (painel, fila e opções), além dos testes em `tests/dialogue-lab.test.mjs`.
 
 ## 🧑‍🌾 Editor de NPCs e decisões (v0.5)
 
