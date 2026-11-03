@@ -38,6 +38,13 @@ export function initCognition({world,social,modelName,isConnected,save}){
       $('social-'+tag+'-text').textContent=value;
     }
     $('social-history').textContent=s.history.length+' percepções recentes · evolução '+s.revision;
+    const entries=$('social-events');entries.replaceChildren();
+    for(const record of s.history.slice(-4).reverse()){
+      const li=document.createElement('li'),topic=document.createElement('small'),desc=document.createElement('span');
+      topic.textContent=record.question||'Interação';
+      desc.textContent=record.insight||'Sem observações';
+      li.append(topic,desc);entries.appendChild(li);
+    }
   }
   $('social-reset').addEventListener('click',()=>{
     if(!confirm('Limpar a opinião e os traços sociais deste NPC? As conversas permanecem.'))return;
