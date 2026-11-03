@@ -146,9 +146,11 @@ export function initNPCEditor(world,rpg,{onChanged=()=>{},onAdded=()=>{},onActio
  $('npc-execute-actions').addEventListener('click',e=>{
   const button=e.target.closest('[data-action]');if(!button)return;
   const action=button.dataset.action;
-  const result=rpg.perform(select.value,{action,place:place.value,item:item.value,quantity:Number(qty.value)});
+  const proposal={actorId:select.value,action,place:place.value,
+    item:item.value,quantity:Number(qty.value)};
+  const result=rpg.perform(proposal.actorId,proposal);
   setMsg(result.message);
-  onAction(result);
+  onAction(result,proposal);
   displayBag();onChanged();
  });
  function refresh(){refreshActors(world.selectedId);fill(world.selectedId);displayBag();}
