@@ -1,3 +1,4 @@
+import {scheduleOllama} from './ollama-queue.js';
 import { makeOllamaRequest } from './ollama.js';
 import { extractNPCReply, isEcho } from './dialogue.js';
 
@@ -50,12 +51,12 @@ export async function testModel(context, model, {
   }
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetchImpl(API + '/chat', {
+    const response = await scheduleOllama(()=>fetchImpl(API + '/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(makeOllamaRequest(context, model)),
       signal: controller.signal
-    });
+    }),{priority:'foreground',signal:controller.signal});
     if (!response.ok) {
       const text = await response.text();
       throw new Error('Ollama HTTP ' + response.status + ': ' + text.slice(0, 160));
