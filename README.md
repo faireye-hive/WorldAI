@@ -1,6 +1,18 @@
-# WorldAI — Living Stories v0.6 (memória social e revisão automática)
+# WorldAI — Living Stories v0.6.1 (correções do Ollama e comércio)
 
 Laboratório de NPCs para futura integração com **Tales of Pirates / Three.js**. Inclui vila 2D, **cinco habitantes com conversas**, cinco criaturas com decisões por regras, relações, memória e salvamento. O chat agora usa o **Ollama + LFM3 ou Qwen3.5**, executado no **seu próprio computador**. Não é necessário baixar modelos no navegador, nem configurar CORS.
+
+## 🧰 Correções de estabilidade — v0.6.1
+
+**Pedido incompleto:** antes, pedir `Me vende um` poderia provocar uma proposta arbitrária do LFM3, como `{"action":"sell","item":"ferro","place":"forja"}`. O motor agora reconhece que o jogador quer **comprar de Lina**, mas pergunta **qual item**. Responder `um pão` em seguida completa o pedido, desde que seja para o mesmo NPC, em até **90 segundos**. Não são realizadas transações sem item explícito e válido. Para guias, locais ambíguos só podem virar destinos existentes no catálogo. Nunca são aceitas inversões de intenção, locais inventados ou mudanças econômicas geradas por texto do modelo.
+
+**JSON da avaliação/reflexão:** usamos preferencialmente o suporte a **JSON Schema estruturado** da API Ollama. O limite de tokens da avaliação passou de 170 para 320/420 tokens; respostas malformadas e erros transitórios HTTP 500/502/503/504 ou 400 (formato incompatível) têm no máximo **uma nova tentativa** usando o modo `format: "json"`. A validação final dos campos continua no JavaScript. Se o Ollama falhar novamente, não modificamos a opinião, a personalidade nem o inventário. As mensagens exibem o erro resumido, sem acumular avisos de outras conversas.
+
+**Uma fila única para o Ollama:** diálogos, propostas de ações, comparações e análises compartilham uma fila de requisições, com prioridade para os pedidos do jogador. Assim o navegador evita disparar vários trabalhos de inferência em paralelo na CPU. A fila existe **somente enquanto o jogo está aberto**, não é uma tarefa agendada externamente.
+
+Um HTTP 500 repetido é erro do Ollama ou da inferência, não necessariamente do código do jogo. Para inspecionar no Linux: `ollama ps`, `ollama list` e, para instalações com systemd, `journalctl -u ollama -n 60 --no-pager`. Nesses casos, desative temporariamente **Avaliar respostas** e **Atualizar opinião** para isolar o erro. O jogo não garante que um modelo pequeno produza sempre JSON coerente.
+
+Os testes de regressão estão em `tests/regressions.test.mjs`; cobrem compra incompleta, retomada com `um pão`, inversão de ação, retry de JSON, erro HTTP 500 e prioridade da fila.
 
 ## 🧠 Memória social, revisão de respostas e personalidade dinâmica (v0.6)
 
