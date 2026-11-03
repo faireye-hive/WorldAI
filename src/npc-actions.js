@@ -1,3 +1,4 @@
+import {scheduleOllama} from './ollama-queue.js';
 import {makeOllamaRequest} from './ollama.js';
 import {PLACES,ITEMS} from './rpg.js';
 
@@ -104,7 +105,7 @@ export async function decideNPCAction(text,actor,rpg,{
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
     try{
       const base=makeOllamaRequest({...rpg.world.getConversationContext(actor),question:text},model);
-      const response=await fetchImpl('/api/ollama/chat',{
+      const response=await scheduleOllama(()=>fetchImpl('/api/ollama/chat',{
         method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json'},
         body:JSON.stringify({...base,format:'json',messages:[
           {role:'system',content:'NPC de RPG. O jogador pediu para ser GUIADO. '+
@@ -113,7 +114,7 @@ export async function decideNPCAction(text,actor,rpg,{
             'Destinos: '+JSON.stringify(PLACES.map(p=>({id:p.id,name:p.name})))},
           {role:'user',content:String(text).slice(0,240)}
         ],options:{...base.options,num_predict:80,temperature:0}})
-      });
+      }),{priority:'foreground',signal:controller.signal});
       if(response.ok){
         const data=await response.json();
         const parsed=JSON.parse(data?.message?.content||'{}');
