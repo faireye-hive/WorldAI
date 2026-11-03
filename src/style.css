@@ -150,3 +150,9 @@ button:disabled{opacity:.5}
 .history-privacy{font-size:11px;color:#9aacbf;line-height:1.65;margin:14px 0 0}
 .history-privacy strong{color:#e5cbbf}
 @media(max-width:620px){.history-panel{padding:13px}.history-controls>*{flex:1 1 100%}.history-filter-label select{width:100%}.history-danger{margin-left:0}.history-counter{flex:1 1 100%}}
+
+/* Opção de animais falantes: checkbox compacto, não herda largura de campos. */
+.npc-edit-form .npc-speaking-option{display:flex;flex-direction:row;align-items:center;gap:9px;
+  border:1px solid #3c4667;background:#18243b;border-radius:10px;padding:12px;
+  color:#c8d0e9;font-size:11px;line-height:1.5;font-weight:600}
+.npc-edit-form .npc-speaking-option input{width:auto;flex:0 0 auto;accent-color:#bba0ee}
