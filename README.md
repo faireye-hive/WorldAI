@@ -1,6 +1,23 @@
-# WorldAI — Living Stories v0.7 (arquivo completo de diálogos)
+# WorldAI — Living Stories v0.8 (coerência de NPCs e auditoria por JSON)
 
 Laboratório de NPCs para futura integração com **Tales of Pirates / Three.js**. Inclui vila 2D, **cinco habitantes com conversas**, cinco criaturas com decisões por regras, relações, memória e salvamento. O chat agora usa o **Ollama + LFM3 ou Qwen3.5**, executado no **seu próprio computador**. Não é necessário baixar modelos no navegador, nem configurar CORS.
+
+## 🧪 Auditoria do histórico e correções de coerência — v0.8
+
+Auditoria do arquivo de diagnóstico de 3/11/2026 com **155 eventos, 24 turnos de conversa, 19 avaliações e 19 reflexões**. O relatório mostrou falhas de coerência mais relevantes que falhas técnicas: todos os 19 vereditos de revisão eram `adequate:true`, mesmo quando a personagem dizia que existiam armas/armaduras não cadastradas; as reflexões frequentemente descreviam o próprio NPC em vez do visitante; a memória enviada ao LFM3 só continha o último par de mensagens; lobos comuns conversavam como humanos; o tempo virtual passava excessivamente rápido; e o relacionamento subia automaticamente em toda interação, inclusive negativas.
+
+Mudanças implementadas:
+- **Contexto e continuidade**: envia os últimos **três pares válidos** de diálogo, as informações reais de estoque, catálogo e vendedores existentes. O prompt manda lembrar do pedido atual e não afirmar que NPCs vendem itens inexistentes.
+- **Compras indisponíveis**: pedidos explícitos de armas, escudos ou armaduras não implementados recebem uma explicação fiel ao catálogo real, com alternativas do estoque do NPC. Nenhuma compra é executada. Em pedidos incompletos, a frase sugerida usa um item disponível **daquele NPC**, não necessariamente pão.
+- **Revisor fundamentado**: o avaliador recebe inventário, catálogo, directory de lojas e histórico recente. O módulo `src/quality.js` identifica contradições simples verificáveis, como “Na Forja tem armaduras”, mesmo se o LFM3 avaliar como 4/5. Essa checagem é **conservadora e incompleta**; não substitui a inspeção das conversas.
+- **Opiniões sobre o jogador**: a reflexão deve se referir expressamente ao **visitante**, com evidência nas palavras dele. Se o modelo descrever Lina/Marcus em vez do jogador ou confundir “Lina” com “Linda”, o jogo arquiva uma descrição neutra da fala e **não altera os traços sociais** nesse turno. Perguntas neutras não aumentam nem diminuem confiança automaticamente.
+- **Relacionamento**: deixa de ganhar +2 automaticamente em qualquer conversa. Agora acompanha a confiança efetivamente validada pela memória social. Os saves antigos são reconciliados ao carregar.
+- **Animais comuns não falam**: um lobo, cervo ou javali normal apenas reage em texto narrativo. É possível configurar um **animal mágico falante** no editor marcando “Este personagem fala com o jogador”.
+- **Ritmo do mundo**: relógio reduzido de 2,9 para 0,25 minuto do jogo por segundo real (um dia virtual a cada ~96 minutos reais), para evitar que uma curta conversa atravesse horas do jogo.
+
+Os testes de regressão em `tests/audit-v07.test.mjs` reproduzem exemplos do arquivo original: armadura inventada, promessa contraditória, revisor complacente, comentário sobre Lina no lugar do visitante e perda de continuidade.
+
+**Ainda não há** implementação real de armas/armaduras no inventário, nem combate ou sistema de missões. Mensagens geradas continuam sujeitas a erros de um modelo pequeno, e essas verificações não são garantia universal de veracidade. O arquivo JSON do usuário não é enviado ao repositório; usamos apenas casos reproduzidos como testes. A versão publicada no GitHub Pages não executa o LFM3 local, portanto a validação real de conversas deve ser feita via `npm run dev`.
 
 ## 📚 Histórico completo e diagnóstico exportável — v0.7
 
