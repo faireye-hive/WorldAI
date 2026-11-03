@@ -90,3 +90,30 @@ button:disabled{opacity:.5}
 .npc-editor-status{min-height:19px;color:#c7b0fb;font-size:12px;margin:14px 0 0;line-height:1.5}
 @media(max-width:1070px){.npc-edit-layout{grid-template-columns:1fr}}
 @media(max-width:620px){.npc-editor{padding:13px}.npc-form-row{grid-template-columns:repeat(2,minmax(0,1fr))}#npc-stock-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.npc-action-args{grid-template-columns:1fr}.npc-action-args label:first-child{grid-column:auto}.npc-manual-actions{grid-template-columns:1fr}.npc-editor-head-actions{width:100%}.npc-editor-head-actions button{flex:1 1 auto}.cmp-shortcut{font-size:9px}}
+
+
+/* v0.6 — percepção social fictícia e revisão de diálogo */
+.social-panel{border-top:1px solid #343e5b;background:#131c31;min-width:0}
+.social-panel summary{padding:12px 16px;color:#ded8f5;font-size:11px;font-weight:800;cursor:pointer;user-select:none}
+.social-panel summary small{font-weight:500;color:#8d9eba}
+.social-body{padding:0 15px 14px}
+.social-head{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:11px;color:#d6e1f5}
+.social-head strong{color:#b7efd2}
+.social-head span{color:#a4adc3}
+.social-opinion{margin:10px 0 5px;font-size:12px;line-height:1.55;color:#f0e6ff;overflow-wrap:anywhere}
+.social-insight{font-size:11px;line-height:1.5;color:#9eb6c8;overflow-wrap:anywhere}
+.social-traits{display:grid;gap:8px;margin-top:10px}
+.social-traits label{display:grid;grid-template-columns:70px minmax(0,1fr) 25px;gap:10px;align-items:center;font-size:11px;color:#bac7df}
+.social-traits meter{height:10px;width:100%;min-width:0}
+.social-traits b{font-size:11px;font-variant-numeric:tabular-nums;text-align:right}
+.social-bottom{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap;margin-top:12px}
+.social-bottom small{font-size:10px;color:#8fa1be}
+.social-bottom button{font-size:10px;color:#eadcf5;background:#29324e;border:1px solid #576082;border-radius:8px;padding:7px}
+.cognition-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:13px}
+.cognition-options label{display:flex;gap:8px;align-items:flex-start;padding:11px;border:1px solid #3c4666;background:#19243c;border-radius:10px;font-size:11px;font-weight:700;color:#e4e2f6;line-height:1.5}
+.cognition-options label input{accent-color:#ac97f0;flex-shrink:0;margin-top:2px}
+.cognition-options label small{display:block;font-size:10px;color:#a1aec6;font-weight:400}
+.cognition-status{min-height:16px;margin:10px 0 0;color:#e0d4a6;font-size:11px;line-height:1.5}
+.cognition-feedback{margin-top:8px;padding:10px 12px;background:#0d172a;color:#aebbd9;border-radius:9px;font-size:11px;line-height:1.5;overflow-wrap:anywhere}
+@media(max-width:980px){.cognition-options{grid-template-columns:1fr}}
+@media(max-width:480px){.social-traits label{grid-template-columns:64px minmax(0,1fr) 25px}.social-panel summary{padding:12px}}
