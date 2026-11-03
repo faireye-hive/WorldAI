@@ -32,6 +32,23 @@ try{const data=JSON.parse(localStorage.getItem('worldai-rpg-save')||'null');if(d
 try{const data=JSON.parse(localStorage.getItem('worldai-social-save')||'null');if(data)social.import(data);}catch{}
 try{const data=JSON.parse(localStorage.getItem('worldai-story-save')||'null');if(data?.selectedId)world.select(data.selectedId);}catch{}
 const all=[...world.actors.values()];
+// Recupera uma única vez o contexto recente da versão antiga (máximo de 10 falas
+// por NPC, pois o motor antigo já descartava o restante).
+try{
+ if(!localStorage.getItem('worldai-log-migrated-v1')){
+  for(const actor of world.actors.values()){
+   for(const item of actor.history||[]){
+    if(item?.role!=='user'&&item?.role!=='assistant')continue;
+    logEvent({type:item.role==='user'?'user_message':'npc_message',
+      actorId:actor.id,actorName:actor.name,model:'legado',
+      mode:'migrated',text:String(item.content||''),
+      details:{importedFrom:'worldai-story-save',note:'Histórico antigo limitado aos turnos ainda salvos.'}});
+   }
+  }
+  localStorage.setItem('worldai-log-migrated-v1','1');
+ }
+}catch{}
+
 world.onEvent=e=>{if(e.type==='decision')state.decisions++;};
 function renderActors(){const list=$('actor-list');list.replaceChildren();$('actors-count').textContent=all.length;$('world-agents').textContent=all.length;for(const a of all){const b=document.createElement('button');b.className='actor-item'+(a.id===world.selectedId?' selected':'');b.type='button';b.dataset.actorId=a.id;b.innerHTML=`<span class="avatar"></span><span class="copy"><strong></strong><small></small></span><span class="status">●</span>`;b.querySelector('.avatar').textContent=a.emoji;b.querySelector('strong').textContent=a.name;b.querySelector('small').textContent=a.role==='wolf'||a.role==='deer'||a.role==='boar'?'Criatura do bosque':a.role.toUpperCase();b.addEventListener('click',()=>selectActor(a.id));list.appendChild(b);}}
 function makeMessage(type,from,text){const article=document.createElement('div');article.className='message '+type;const by=document.createElement('small');by.textContent=from;const content=document.createElement('div');content.textContent=text;article.append(by,content);return article;}
