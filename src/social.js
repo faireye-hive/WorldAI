@@ -69,8 +69,11 @@ export class SocialMemory {
     return true;
   }
   reset(id){
-    if(!this.world.actors.has(id))return false;
-    this.states.set(id,baseline());return true;
+    const actor=this.world.actors.get(id);
+    if(!actor)return false;
+    this.states.set(id,baseline());
+    actor.relationship=0;
+    return true;
   }
   export(){
     return {version:1,states:[...this.states].filter(([id])=>this.world.actors.has(id))
@@ -97,6 +100,8 @@ export class SocialMemory {
         patienceChange:numeric(e.patienceChange,-2,2)
       })):[];
       this.states.set(obj.id,s);
+      const actor=this.world.actors.get(obj.id);
+      if(actor)actor.relationship=clamp((s.trust-50)*2,-100,100);
     }
     return true;
   }
