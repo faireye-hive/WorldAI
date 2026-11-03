@@ -43,6 +43,12 @@ export function buildNPCMessages(data, retry = false) {
     "Respond to what the player said; do not repeat or quote their question.",
     "Never invent items, rewards, money, completed quests or changes to game state.",
     "Time: " + time + ".",
+    data.social ? "NPC simulated opinion of visitor: " + short(data.social.opinion,140) +
+      ". Emotional stance: " + short(data.social.feeling,20) +
+      ". Trust: " + data.social.trust + "/100. Openness: " + data.social.openness +
+      "/100. Patience: " + data.social.patience +
+      "/100. Respond with more caution if distrustful, warmth if friendly, " +
+      "but do not invent past events or claim real feelings." : "",
     "Character background: " + short(data.description, 260) + ".",
     "World facts: Vila Aurora contains " + (Array.isArray(data.knownPlaces) ? data.knownPlaces.map(p=>p.name).slice(0,8).join(", ") : "a small village") + ".",
     "Allowed interactions: " + (Array.isArray(data.allowedActions) ? data.allowedActions.join(", ") : "none") + ".",
