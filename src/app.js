@@ -20,7 +20,7 @@ const sessionId=(()=>{
 const recorder=new DialogueRecorder({sessionId});
 let historyUI=null,turnSequence=0;
 function logEvent(event){recorder.record(event).catch(()=>{});historyUI?.refreshSoon();}
-logEvent({type:'session_started',text:'Jogo carregado ou recarregado',details:{appVersion:'0.7',url:location.pathname,agent:navigator.userAgent}});
+logEvent({type:'session_started',text:'Jogo carregado ou recarregado',details:{appVersion:'0.8',url:location.pathname,agent:navigator.userAgent}});
 
 const state={ready:false,loading:false,busy:false,decisions:0,lastSelected:null,toastUntil:0,pendingRequest:null};
 const hints=['Olá, tudo bem?','Como você se chama?','Você precisa de ajuda?','Conhece algum segredo?'];
