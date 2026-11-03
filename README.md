@@ -1,6 +1,31 @@
-# WorldAI — Living Stories v0.6.1 (correções do Ollama e comércio)
+# WorldAI — Living Stories v0.7 (arquivo completo de diálogos)
 
 Laboratório de NPCs para futura integração com **Tales of Pirates / Three.js**. Inclui vila 2D, **cinco habitantes com conversas**, cinco criaturas com decisões por regras, relações, memória e salvamento. O chat agora usa o **Ollama + LFM3 ou Qwen3.5**, executado no **seu próprio computador**. Não é necessário baixar modelos no navegador, nem configurar CORS.
+
+## 📚 Histórico completo e diagnóstico exportável — v0.7
+
+O WorldAI agora grava, continuamente e **sem limitar ao contexto recente do NPC**, os eventos de conversa em um banco **IndexedDB** no navegador. Esse banco é separado dos estados do mundo que continuam no `localStorage`. O arquivo registra:
+
+- As mensagens do **jogador** e as respostas do **NPC**, com data/hora, identificador do personagem, modelo e ID do turno.
+- As respostas **brutas** obtidas do Ollama e as tentativas/erros (incluindo eventuais HTTP 500). Não inclui credenciais ou cabeçalhos de autenticação.
+- Respostas de roteiro/offline, **pedidos de esclarecimento**, ações de compra/venda/guia e o resultado validado pelo motor (saldo e inventário simulados após a operação).
+- **Avaliações** de diálogo, saída JSON do avaliador, falhas de parse, **reflexões sociais**, erros e respostas reescritas.
+- **Testes do comparador de modelos**, contexto usado, resultados e preferência manual.
+- Um snapshot do **contexto disponível para o NPC** no início de cada turno (personalidade, informações, inventário e memórias recentes). Isso facilita reproduzir erros.
+
+### Exportar para me enviar
+
+1. Abra o jogo sempre no **mesmo endereço**: `http://127.0.0.1:5173/` (não alterne com `localhost` nem GitHub Pages: são origens diferentes e têm históricos separados).
+2. Converse normalmente; o painel **◷ Histórico** mostrará o total de eventos gravados. Mesmo fechando a aba, eles continuam no banco local.
+3. Clique em **↓ Exportar JSON** para obter um diagnóstico estruturado de todas as sessões e NPCs, sem filtro; é o formato mais útil para análise técnica.
+4. Opcionalmente escolha um NPC ou marque **Somente sessão atual** para exportar apenas uma parte, ou clique em **↓ Exportar TXT** para leitura direta.
+5. Envie o arquivo gerado para o chat com uma nota descrevendo o comportamento incorreto. O arquivo JSON permitirá relacionar pergunta, resposta, modelo, avaliações, reflexões e erros da mesma interação.
+
+**Privacidade:** o WorldAI não envia este histórico automaticamente para a nuvem ou para o GitHub. Os arquivos exportados incluem as mensagens que você digitou e detalhes do estado do jogo; **revise antes de compartilhar**, especialmente se escreveu informações pessoais. **Apagar registros** só remove este arquivo de diagnóstico local; não apaga o estado do jogo. O botão de reiniciar o mundo também não apaga o arquivo, permitindo investigar bugs após o reset.
+
+**Limitações:** os navegadores podem eliminar o armazenamento local, e o IndexedDB pode falhar em modo privado ou se acabar o espaço. O painel mostra problemas de gravação em vez de ocultá-los. **Exporte periodicamente** uma cópia. Ao migrar para a versão 0.7, apenas as últimas falas ainda presentes no salvamento antigo podem ser recuperadas (a versão anterior mantinha no máximo 10 por NPC); conversas já eliminadas não podem ser reconstruídas.
+
+Implementação: `src/dialogue-recorder.js` (IndexedDB e exportação), `src/history-ui.js` (filtros, prévia e download), testes em `tests/recorder.test.mjs`. O código de testes utiliza IndexedDB simulado para verificar persistência, retomada e exportação. Arquivos de diagnóstico são locais ao dispositivo e à origem do site.
 
 ## 🧰 Correções de estabilidade — v0.6.1
 
