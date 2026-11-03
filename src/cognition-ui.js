@@ -3,7 +3,7 @@ import {reviewDialogue,rewriteDialogue,reflectOnConversation} from './dialogue-l
 const $=id=>document.getElementById(id);
 const asText=v=>String(v??'');
 const defaultOpts={review:true,rewrite:true,reflect:true};
-export function initCognition({world,social,modelName,isConnected,save}){
+export function initCognition({world,social,modelName,isConnected,save,logEvent=()=>{}}){
   const status=$('cognition-status'),last=$('cognition-feedback');
   const switches={review:$('lab-auto-review'),rewrite:$('lab-auto-rewrite'),reflect:$('lab-reflect')};
   let options=defaultOpts;
@@ -52,17 +52,26 @@ export function initCognition({world,social,modelName,isConnected,save}){
     report('Percepção social de '+world.selected.name+' reiniciada.');
   });
 
-  async function runDialogueLab({actor,question,reply,mode,context,speechNode,responseEntry,memoryEntry}){
+  async function runDialogueLab({actor,question,reply,mode,context,speechNode,responseEntry,memoryEntry,turnId}){
     if(!isConnected()||mode!=='ollama'||(!options.review&&!options.reflect))return;
     // Captured at send time: changes to toggles affect subsequent dialogue, not this one.
     const planned={...options};
     if(jobs>=3){
       report('Fila de análises cheia; esta conversa foi mantida sem avaliação extra.');
+      logEvent({type:'analysis_skipped',actorId:actor.id,actorName:actor.name,
+        turnId,text:'Fila de análises cheia'});
       return;
     }
     jobs++;
     queue=queue.catch(()=>{}).then(async()=>{
       const model=modelName();
+      const log=(type,text,details,level)=>logEvent({
+        type,actorId:actor.id,actorName:actor.name,turnId,model,mode:'ollama',
+        text,details,level
+      });
+      const rawTrace=phase=>entry=>log('model_attempt',
+        entry.raw||entry.error||entry.type,
+        {phase,attempt:entry.attempt,status:entry.status,traceType:entry.type});
       let current=reply;
       const diagnostics=[];
       const note=message=>{
@@ -74,13 +83,14 @@ export function initCognition({world,social,modelName,isConnected,save}){
         if(planned.review){
           report('Avaliando resposta de '+actor.name+'… ('+jobs+' na fila)');
           try{
-            const verdict=await reviewDialogue(context,current,{model});
+            const verdict=await reviewDialogue(context,current,{model,onTrace:rawTrace('review')});
+            log('review','Avaliação da resposta', {question,answer:current,verdict});
             const desc='Nota de adequação '+verdict.score+'/5: '+verdict.reason;
             note('Avaliação estimada '+verdict.score+'/5: '+verdict.reason);
             if(!verdict.adequate && planned.rewrite){
               report('Tentando melhorar resposta de '+actor.name+'…');
               try{
-                const improved=await rewriteDialogue(context,current,verdict,{model});
+                const improved=await rewriteDialogue(context,current,verdict,{model,onTrace:rawTrace('rewrite')});
                 if(improved&&responseEntry?.content===current&&actor.history.includes(responseEntry)){
                   responseEntry.content=improved;
                   if(memoryEntry&&actor.memories.includes(memoryEntry)){
@@ -91,29 +101,34 @@ export function initCognition({world,social,modelName,isConnected,save}){
                     if(body)body.textContent=improved;
                     speechNode.classList.add('npc-revised');
                   }
+                  log('rewrite',improved,{question,original:current,review:verdict});
                   current=improved;
                   note('Resposta melhorada: '+improved.slice(0,150));
                   save();
                 }
               }catch(err){
+                log('rewrite_error',String(err.message||err),{question,original:current},'error');
                 note('Não foi possível refazer a resposta: '+asText(err.message).slice(0,90));
               }
             }
           }catch(err){
+            log('review_error',String(err.message||err),{question,answer:current},'error');
             note('Avaliação indisponível: '+asText(err.message).slice(0,140));
           }
         }
         if(planned.reflect){
           report('Atualizando a percepção de '+actor.name+' sobre o jogador…');
           try{
-            const reflection=await reflectOnConversation(context,current,{model});
+            const reflection=await reflectOnConversation(context,current,{model,onTrace:rawTrace('reflection')});
             if(social.applyReflection(actor.id,reflection,question)){
               if(world.selectedId===actor.id)render(actor.id);
               save();
+              log('reflection',reflection.opinion,{question,answer:current,reflection,socialAfter:social.context(actor.id)});
               note('Percepção atualizada: '+reflection.feeling+
                 ' ('+reflection.trustChange+' confiança).');
             }
           }catch(err){
+            log('reflection_error',String(err.message||err),{question,answer:current},'error');
             note('Reflexão não disponível: '+asText(err.message).slice(0,140));
           }
         }
