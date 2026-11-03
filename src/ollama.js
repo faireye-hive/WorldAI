@@ -1,3 +1,4 @@
+import {scheduleOllama} from './ollama-queue.js';
 import { buildNPCMessages, extractNPCReply } from './dialogue.js';
 
 export const DEFAULT_MODEL = 'qwen3.5:0.8b';
@@ -48,12 +49,12 @@ export async function askOllama(context, { fetchImpl = fetch, model = DEFAULT_MO
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const response = await fetchImpl(endpoint('/chat'), {
+      const response = await scheduleOllama(()=>fetchImpl(endpoint('/chat'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
         body: JSON.stringify(makeOllamaRequest(context, model, attempt > 0))
-      });
+      }),{priority:'foreground',signal:controller.signal});
       if (!response.ok) {
         const raw = await response.text();
         throw new Error('Ollama HTTP ' + response.status + ': ' + raw.slice(0, 160));
