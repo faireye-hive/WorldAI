@@ -1,10 +1,11 @@
+import {scheduleOllama} from './ollama-queue.js';
 import {makeOllamaRequest} from './ollama.js';
 import {extractNPCReply, isEcho} from './dialogue.js';
 
 const bound=(v,max)=>String(v??'').trim().slice(0,max);
 const finite=(v,lo,hi,defaultValue)=>Number.isFinite(Number(v))
   ?Math.max(lo,Math.min(hi,Math.round(Number(v)))):defaultValue;
-export const REVIEW_TIMEOUT_MS=22000;
+export const REVIEW_TIMEOUT_MS=45000;
 
 export function parseJSONObject(raw){
   if(typeof raw!=='string')throw Error('A avaliação não retornou JSON.');
@@ -19,25 +20,70 @@ export function parseJSONObject(raw){
   return value;
 }
 
-async function ollamaJSON(messages,{model,fetchImpl=fetch,timeoutMs=REVIEW_TIMEOUT_MS}={}){
-  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),timeoutMs);
-  try{
-    const response=await fetchImpl('/api/ollama/chat',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      signal:controller.signal,
-      body:JSON.stringify({
-        model,stream:false,think:false,format:'json',keep_alive:'10m',
-        messages,options:{temperature:0.1,num_predict:170,num_ctx:2048}
-      })
-    });
-    if(!response.ok)throw Error('HTTP '+response.status);
-    const json=await response.json();
-    return parseJSONObject(json?.message?.content);
-  }catch(err){
-    if(err.name==='AbortError')throw Error('Tempo de revisão excedido.');
-    throw err;
-  }finally{clearTimeout(timeout);}
+const REVIEW_SCHEMA={
+  type:'object',additionalProperties:false,
+  properties:{
+    adequate:{type:'boolean'},score:{type:'integer',minimum:0,maximum:5},
+    reason:{type:'string'},improvement:{type:'string'}
+  },required:['adequate','score','reason','improvement']
+};
+const REFLECTION_SCHEMA={
+  type:'object',additionalProperties:false,
+  properties:{
+    opinion:{type:'string'},insight:{type:'string'},
+    feeling:{type:'string',enum:['neutro','curioso','confiante','cauteloso','respeitoso','desconfiado']},
+    trustChange:{type:'integer',minimum:-3,maximum:3},
+    opennessChange:{type:'integer',minimum:-2,maximum:2},
+    patienceChange:{type:'integer',minimum:-2,maximum:2}
+  },required:['opinion','insight','feeling','trustChange','opennessChange','patienceChange']
+};
+const sleep=ms=>new Promise(done=>setTimeout(done,ms));
+
+async function ollamaJSON(messages,{model,fetchImpl=fetch,timeoutMs=REVIEW_TIMEOUT_MS,schema=REVIEW_SCHEMA}={}){
+  let lastError;
+  // First attempt: constrained JSON schema. Second attempt: plain JSON for
+  // compatibility with small/older Ollama builds, plus a larger token budget.
+  for(let attempt=0;attempt<2;attempt++){
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),timeoutMs);
+    try{
+      const response=await scheduleOllama(()=>fetchImpl('/api/ollama/chat',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        signal:controller.signal,
+        body:JSON.stringify({
+          model,stream:false,think:false,format:attempt===0?schema:'json',
+          keep_alive:'10m',messages,
+          options:{temperature:0,num_predict:attempt===0?320:420,num_ctx:3072}
+        })
+      }),{priority:'background',signal:controller.signal});
+      if(!response.ok){
+        let details='';
+        try{details=String(await response.text()).slice(0,180);}catch{}
+        const msg='HTTP '+response.status+(details?': '+details:'');
+        const error=new Error(msg);
+        // 400 often means constrained format is unsupported; retry using JSON.
+        // 500/502/503 could be temporary inference errors; at most one retry.
+        if(attempt===0 && [400,429,500,502,503,504].includes(response.status)){
+          lastError=error;await sleep(350);continue;
+        }
+        throw error;
+      }
+      const json=await response.json();
+      const raw=json?.message?.content;
+      try{
+        return parseJSONObject(raw);
+      }catch(error){
+        lastError=new Error('A resposta da IA não continha JSON completo. '+error.message);
+        if(attempt===0){await sleep(150);continue;}
+        throw lastError;
+      }
+    }catch(err){
+      if(err.name==='AbortError')throw Error('Ollama excedeu '+Math.round(timeoutMs/1000)+'s nesta análise.');
+      // Network errors do not improve by repeatedly submitting heavy jobs.
+      throw err;
+    }finally{clearTimeout(timeout);}
+  }
+  throw lastError||Error('Ollama não retornou dados válidos.');
 }
 
 export function sanitizeReview(data,question,answer){
@@ -63,7 +109,7 @@ export async function reviewDialogue(context,answer,opts={}){
       knownFacts:context.description,allowedActions:context.allowedActions,
       playerQuestion:question,npcAnswer:bound(answer,450)
     })}
-  ],opts);
+  ],{...opts,schema:REVIEW_SCHEMA});
   return sanitizeReview(result,question,answer);
 }
 
@@ -82,12 +128,12 @@ export async function rewriteDialogue(context,previous,review,{
   });
   const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),timeoutMs);
   try{
-    const response=await fetchImpl('/api/ollama/chat',{
+    const response=await scheduleOllama(()=>fetchImpl('/api/ollama/chat',{
       method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,
       body:JSON.stringify({...base,messages,options:{
-        ...base.options,temperature:0.55,num_predict:110
+        ...base.options,temperature:0.55,num_predict:130
       }})
-    });
+    }),{priority:'background',signal:controller.signal});
     if(!response.ok)throw Error('HTTP '+response.status);
     const data=await response.json();
     return extractNPCReply([{generated_text:data?.message?.content}],context.question);
@@ -127,6 +173,6 @@ export async function reflectOnConversation(context,answer,{model,fetchImpl=fetc
       currentFeeling:context.social?.feeling,playerSaid:bound(context.question,240),
       npcReplied:bound(answer,450)
     })}
-  ],{model,fetchImpl,timeoutMs});
+  ],{model,fetchImpl,timeoutMs,schema:REFLECTION_SCHEMA});
   return sanitizeReflection(data);
 }
