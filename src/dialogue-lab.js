@@ -1,3 +1,4 @@
+import {objectiveDialogueIssues} from './quality.js';
 import {scheduleOllama} from './ollama-queue.js';
 import {makeOllamaRequest} from './ollama.js';
 import {extractNPCReply, isEcho} from './dialogue.js';
@@ -89,13 +90,20 @@ async function ollamaJSON(messages,{model,fetchImpl=fetch,timeoutMs=REVIEW_TIMEO
   throw lastError||Error('Ollama não retornou dados válidos.');
 }
 
-export function sanitizeReview(data,question,answer){
+export function sanitizeReview(data,question,answer,context={}){
   if(typeof data?.adequate!=='boolean')throw Error('Veredito ausente.');
   const reason=bound(data.reason,180);
   if(!reason)throw Error('Motivo ausente.');
-  // Cheap deterministic check overrules the model on clear echo.
-  return {adequate:data.adequate&&!isEcho(answer,question),
-    score:finite(data.score,0,5,2),reason,improvement:bound(data.improvement,180)};
+  const issues=objectiveDialogueIssues(context,answer);
+  // An LLM can approve a fabricated offer with 4/5: hard world facts win.
+  return {
+    adequate:data.adequate&&!isEcho(answer,question)&&issues.length===0,
+    score:issues.length?Math.min(2,finite(data.score,0,5,2)):finite(data.score,0,5,2),
+    reason:issues.length?bound(reason+' | '+issues.join(' '),180):reason,
+    improvement:issues.length?
+      'Responda sem inventar produtos, promessas ou ações concluídas. Use somente o catálogo existente.':
+      bound(data.improvement,180)
+  };
 }
 
 export async function reviewDialogue(context,answer,opts={}){
@@ -106,14 +114,22 @@ export async function reviewDialogue(context,answer,opts={}){
       'Julgue a resposta pelas informações fornecidas, não tente adivinhar o que a pessoa realmente pensa. '+
       'Verifique se responde ao pedido, respeita personagem, evita inventar fatos ou ações realizadas e não repete a pergunta. '+
       'Retorne APENAS JSON: {"adequate":true|false,"score":0-5,"reason":"curto","improvement":"orientação curta"}. '+
-      'Considere adequada uma resposta simples e coerente, mesmo que não seja perfeita.'},
+      'NÃO aprove uma fala que prometa itens não cadastrados, invente estoque, afirme que uma ação foi concluída sem confirmação ou confunda a identidade. '+
+      'Aplique o critério: 5 excelente e fiel aos fatos; 4 relevante e correto; 3 parcialmente útil, mas incompleto; 2 ou menos falha importante. '+
+      'Para pedidos de produto inexistente, é CORRETO dizer que não existe no catálogo e oferecer alternativas reais. '+
+      'Se houver contradição de inventário ou promessa impossível, adequate=false mesmo que a frase seja simpática.'},
     {role:'user',content:JSON.stringify({
-      npc:context.name,personality:context.biography,profession:context.role,
+      npc:context.name,species:context.species,
+      personality:context.biography,profession:context.role,
       knownFacts:context.description,allowedActions:context.allowedActions,
+      inventory:context.inventory||[],catalog:context.catalog||[],
+      vendorDirectory:context.vendors||[],
+      shopPolicy:'Armas e armaduras não estão implementadas; não podem estar à venda nesta versão.',
+      previousTalks:Array.isArray(context.history)?context.history.slice(-4):[],
       playerQuestion:question,npcAnswer:bound(answer,450)
     })}
   ],{...opts,schema:REVIEW_SCHEMA});
-  return sanitizeReview(result,question,answer);
+  return sanitizeReview(result,question,answer,context);
 }
 
 export async function rewriteDialogue(context,previous,review,{
@@ -145,39 +161,63 @@ export async function rewriteDialogue(context,previous,review,{
   }finally{clearTimeout(timeout);}
 }
 
-export function sanitizeReflection(value){
+export function sanitizeReflection(value,context=null){
   if(!value||typeof value!=='object'||Array.isArray(value))throw Error('Reflexão inválida.');
-  const opinion=bound(value.opinion,180),insight=bound(value.insight,180);
+  let opinion=bound(value.opinion,180),insight=bound(value.insight,180);
   if(!opinion||!insight)throw Error('A IA não forneceu uma percepção válida.');
-  return {
-    opinion,insight,
-    feeling:['neutro','curioso','confiante','cauteloso','respeitoso','desconfiado']
-      .includes(value.feeling)?value.feeling:'neutro',
-    trustChange:finite(value.trustChange,-3,3,0),
-    opennessChange:finite(value.opennessChange,-2,2,0),
-    patienceChange:finite(value.patienceChange,-2,2,0)
-  };
+  let trustChange=finite(value.trustChange,-3,3,0);
+  let opennessChange=finite(value.opennessChange,-2,2,0);
+  let patienceChange=finite(value.patienceChange,-2,2,0);
+  let feeling=['neutro','curioso','confiante','cauteloso','respeitoso','desconfiado']
+      .includes(value.feeling)?value.feeling:'neutro';
+  if(context){
+    const name=String(context.name||'').trim().toLocaleLowerCase('pt-BR');
+    const lower=opinion.toLocaleLowerCase('pt-BR');
+    const focusesNpc=name.length>1&&(lower.startsWith(name+' ')||lower.startsWith('o '+name+' ')||lower.startsWith('a '+name+' '));
+    const focusedAnimal=context.species!=='human' && /^(o lobo|a corca|o cervo|o javali)\b/i.test(lower);
+    const original=bound(context.question,125);
+    const playerEvidence=original?'O visitante disse: "'+original+'".':'O visitante conversou com este NPC.';
+    if(focusesNpc||focusedAnimal){
+      // Small models often describe what the NPC said or did, instead of
+      // what the NPC thinks of the PLAYER. Do not persist that confusion.
+      opinion=bound(playerEvidence,180);
+      insight=bound('Interação observada: '+original,180);
+      trustChange=0;opennessChange=0;patienceChange=0;feeling='neutro';
+    }else{
+      const neutralGreeting=/^(oi|ola|bom dia|boa tarde|boa noite|quem e|voce e|qual|onde|tchau)\b/i.test(
+        original.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase());
+      // Neutral questions are NOT evidence of trust or distrust.
+      if(neutralGreeting)trustChange=0;
+    }
+  }
+  return {opinion,insight,feeling,trustChange,opennessChange,patienceChange};
 }
 
 export async function reflectOnConversation(context,answer,{model,fetchImpl=fetch,timeoutMs=REVIEW_TIMEOUT_MS,onTrace=()=>{}}={}){
   const data=await ollamaJSON([
     {role:'system',content:
-      'Você é um motor de estado SOCIAL FICTÍCIO para personagens de RPG. '+
-      'Não exponha cadeia de pensamento nem raciocínio interno. Escreva apenas um RESUMO NARRATIVO de como o NPC poderia interpretar a conversa. '+
-      'Não infira atributos sensíveis, vida pessoal real, saúde, crenças ou intimidade do jogador. '+
-      'Não alegue fatos não expressos pelo jogador. '+
-      'Modifique os traços com moderação: trustChange de -3 a 3; opennessChange e patienceChange de -2 a 2. '+
-      'Perguntas neutras normalmente não alteram confiança (0). Evite aumentar confiança automaticamente. '+
+      'Você atualiza um estado SOCIAL FICTÍCIO de um NPC de RPG. '+
+      'O NPC é o OBSERVADOR. O JOGADOR é uma pessoa DIFERENTE. '+
+      'O campo opinion deve começar com "O visitante..." e descrever SOMENTE como o NPC interpreta o JOGADOR. '+
+      'Não descreva a própria personalidade, fala ou sentimentos do NPC como opinião sobre o jogador. '+
+      'O campo insight deve conter evidência da mensagem do JOGADOR, não da resposta do NPC. '+
+      'Não exponha cadeia de pensamento nem raciocínio interno. Produza resumos narrativos curtos. '+
+      'Não infira dados sensíveis da pessoa real ou fatos ausentes do diálogo. '+
+      'Agradecimentos ou atos explícitos podem afetar confiança levemente; perguntas neutras recebem trustChange=0. '+
+      'Mudanças pequenas: trustChange -3 a 3; opennessChange e patienceChange -2 a 2. '+
       'JSON EXATO: {"opinion":"opinião curta sobre o visitante",'+
       '"insight":"fato ou impressão da conversa com evidência",'+
       '"feeling":"neutro|curioso|confiante|cauteloso|respeitoso|desconfiado",'+
       '"trustChange":0,"opennessChange":0,"patienceChange":0}.'},
     {role:'user',content:JSON.stringify({
-      npc:context.name,personality:context.biography,
-      description:context.description,previousOpinion:context.social?.opinion,
-      currentFeeling:context.social?.feeling,playerSaid:bound(context.question,240),
+      observerNPC:context.name,
+      npcSpecies:context.species||'human',
+      observerPersonality:context.biography,
+      observerBackground:context.description,
+      previousOpinionABOUT_PLAYER:context.social?.opinion,
+      playerSaid:bound(context.question,240),
       npcReplied:bound(answer,450)
     })}
   ],{model,fetchImpl,timeoutMs,schema:REFLECTION_SCHEMA,onTrace});
-  return sanitizeReflection(data);
+  return sanitizeReflection(data,context);
 }
