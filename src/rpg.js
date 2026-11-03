@@ -46,6 +46,7 @@ export function normalizeProfile(source={}){
    biography:clean(source.biography,180)||'Curioso e reservado',
    description:clean(source.description,380)||'Conhece a Vila Aurora.',
    emoji:clean(source.emoji,4)||(species==='human'?'🧑':'🐾'),
+   canSpeak:typeof source.canSpeak==='boolean'?source.canSpeak:species==='human',
    actions,stock:sanitizeStock(source.stock),gold:amount(source.gold)??60
  };
 }
@@ -79,6 +80,12 @@ export class RPGWorld {
    inventory:Object.entries(this.profile(actor.id).stock).filter(([,n])=>n>0).map(([id,stock])=>({
      id,name:itemMap.get(id).name,stock,price:itemMap.get(id).price
    })),
+   catalog:ITEMS.map(i=>({id:i.id,name:i.name})),
+   vendors:[...this.world.actors.values()].filter(a=>a.species==='human').map(a=>({
+     name:a.name,role:a.title,items:Object.entries(this.profile(a.id)?.stock||{})
+       .filter(([,count])=>count>0).map(([id])=>itemMap.get(id)?.name).filter(Boolean)
+   })).filter(v=>v.items.length),
+   canSpeak:this.profile(actor.id).canSpeak,
    playerGold:this.gold
   });
  }
