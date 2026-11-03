@@ -64,13 +64,19 @@ export function initCognition({world,social,modelName,isConnected,save}){
     queue=queue.catch(()=>{}).then(async()=>{
       const model=modelName();
       let current=reply;
+      const diagnostics=[];
+      const note=message=>{
+        diagnostics.push(message);
+        last.textContent=diagnostics.join(' · ').slice(0,500);
+      };
+      last.textContent='Analisando a conversa de '+actor.name+'...';
       try{
         if(planned.review){
           report('Avaliando resposta de '+actor.name+'… ('+jobs+' na fila)');
           try{
             const verdict=await reviewDialogue(context,current,{model});
             const desc='Nota de adequação '+verdict.score+'/5: '+verdict.reason;
-            last.textContent=desc;
+            note('Avaliação estimada '+verdict.score+'/5: '+verdict.reason);
             if(!verdict.adequate && planned.rewrite){
               report('Tentando melhorar resposta de '+actor.name+'…');
               try{
@@ -86,15 +92,15 @@ export function initCognition({world,social,modelName,isConnected,save}){
                     speechNode.classList.add('npc-revised');
                   }
                   current=improved;
-                  last.textContent=desc+' · Revisão aplicada: '+improved.slice(0,150);
+                  note('Resposta melhorada: '+improved.slice(0,150));
                   save();
                 }
               }catch(err){
-                last.textContent=desc+' · A revisão falhou: '+asText(err.message).slice(0,90);
+                note('Não foi possível refazer a resposta: '+asText(err.message).slice(0,90));
               }
             }
           }catch(err){
-            last.textContent='Avaliação indisponível: '+asText(err.message).slice(0,100);
+            note('Avaliação indisponível: '+asText(err.message).slice(0,140));
           }
         }
         if(planned.reflect){
@@ -104,13 +110,11 @@ export function initCognition({world,social,modelName,isConnected,save}){
             if(social.applyReflection(actor.id,reflection,question)){
               if(world.selectedId===actor.id)render(actor.id);
               save();
-              const info=last.textContent;
-              last.textContent=info+' · Percepção: '+reflection.feeling+
-                ' ('+reflection.trustChange+' confiança).';
+              note('Percepção atualizada: '+reflection.feeling+
+                ' ('+reflection.trustChange+' confiança).');
             }
           }catch(err){
-            last.textContent=last.textContent+' · Reflexão não disponível: '+
-              asText(err.message).slice(0,100);
+            note('Reflexão não disponível: '+asText(err.message).slice(0,140));
           }
         }
         report('Análise desta conversa concluída. Pode continuar jogando normalmente.');
