@@ -19,6 +19,16 @@ export class SocialMemory {
     for(const a of world.actors.values())this.ensure(a.id);
     const old=world.getConversationContext.bind(world);
     world.getConversationContext=actor=>({...old(actor),social:this.context(actor.id)});
+    // Express small social changes in ambient NPC behavior, without overriding
+    // combat, navigation, escort, or any actual game permission.
+    const oldDecide=world.decide.bind(world);
+    world.decide=actor=>{
+      oldDecide(actor);
+      if(actor.species!=='human'||actor.state==='guiding')return;
+      const mood=this.get(actor.id);
+      if(mood.openness>=60 && actor.state==='observing')actor.state='socializing';
+      if(mood.openness<=40 && actor.state==='socializing')actor.state='observing';
+    };
   }
   ensure(id){
     if(!this.states.has(id))this.states.set(id,baseline());
