@@ -28,6 +28,27 @@ export function findRequestedItem(text){
   const s=normalized(text);
   return ITEMS.find(item=>(ITEM_ALIASES[item.id]||[item.id]).some(alias=>token(s,normalized(alias))))?.id||null;
 }
+/** Identifica mercadorias ainda NÃO implementadas no sandbox.
+ * Não significa que o NPC realmente tenha esses produtos para vender.
+ */
+export function unavailableGoods(text){
+ const s=normalized(text);
+ const found=[];
+ if(/\b(armadura|armaduras|escudo|escudos)\b/.test(s))found.push('armaduras e escudos');
+ if(/\b(espada|espadas|arma|armas|adaga|adagas|arco|arcos)\b/.test(s))found.push('armas');
+ return [...new Set(found)];
+}
+export function unavailableItemReply(actor,rpg,text){
+ const kinds=unavailableGoods(text);
+ if(!kinds.length)return null;
+ const cfg=rpg.profile(actor.id);
+ const available=ITEMS.filter(item=>(cfg?.stock?.[item.id]||0)>0);
+ const own=available.map(i=>i.name+' ('+i.price+' moedas)').join(', ');
+ return 'Ainda não existem '+kinds.join(' nem ')+' no catálogo desta demonstração. '+
+   actor.name+' não pode vendê-los e não vou prometer que outra loja os tenha. '+
+   (own?'Aqui estão disponíveis: '+own+'. ':'Não tenho produtos disponíveis no momento. ')+
+   'Posso ajudar com os itens existentes ou indicar um local da vila.';
+}
 export function findRequestedPlace(text){
   const s=normalized(text);
   return PLACES.find(place=>(PLACE_ALIASES[place.id]||[place.id]).some(alias=>token(s,normalized(alias))))?.id||null;
@@ -80,7 +101,7 @@ export function clarificationFor(actor,rpg,intent){
       ' ('+item.price+' moedas, estoque '+cfg.stock[item.id]+')')).join('; ');
   const subject=intent.action==='sell'?'vender':intent.action==='give'?'receber':'comprar';
   return 'Qual item você quer '+subject+'? '+(choices||'Não há itens disponíveis no momento.')+
-    '. Diga, por exemplo: "um pão".';
+    (items.length?' Se quiser, diga: "Quero '+subject+' '+items[0].name+'".':'');
 }
 export async function decideNPCAction(text,actor,rpg,{
   fetchImpl=fetch,model='lfm3:latest',timeoutMs=25000,intentOverride=null
@@ -92,9 +113,13 @@ export async function decideNPCAction(text,actor,rpg,{
     return {intent,proposal:intent,mode:'rules'}; // engine refuses unauthorized actions
   // Missing purchase item is NEVER guessed by an LLM: a short "me vende um"
   // must ask the player to name the item, not invent a sale.
-  if(intent.action!=='guide'&&!intent.item)
+  if(intent.action!=='guide'&&!intent.item){
+    if(intent.action==='buy'&&unavailableGoods(text).length)
+      return {intent,proposal:null,mode:'unavailable',
+        message:unavailableItemReply(actor,rpg,text)};
     return {intent,proposal:null,mode:'clarify',
       message:clarificationFor(actor,rpg,intent)};
+  }
   if(intent.action==='guide'&&!intent.place){
     const s=normalized(text);
     // Only consult an LLM for an explicit but semantically mappable destination,
