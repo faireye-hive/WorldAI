@@ -39,7 +39,7 @@ const REFLECTION_SCHEMA={
 };
 const sleep=ms=>new Promise(done=>setTimeout(done,ms));
 
-async function ollamaJSON(messages,{model,fetchImpl=fetch,timeoutMs=REVIEW_TIMEOUT_MS,schema=REVIEW_SCHEMA}={}){
+async function ollamaJSON(messages,{model,fetchImpl=fetch,timeoutMs=REVIEW_TIMEOUT_MS,schema=REVIEW_SCHEMA,onTrace=()=>{}}={}){
   let lastError;
   // First attempt: constrained JSON schema. Second attempt: plain JSON for
   // compatibility with small/older Ollama builds, plus a larger token budget.
@@ -58,7 +58,8 @@ async function ollamaJSON(messages,{model,fetchImpl=fetch,timeoutMs=REVIEW_TIMEO
       }),{priority:'background',signal:controller.signal});
       if(!response.ok){
         let details='';
-        try{details=String(await response.text()).slice(0,180);}catch{}
+        try{details=String(await response.text()).slice(0,500);}catch{}
+        try{onTrace({type:'http_error',attempt:attempt+1,status:response.status,raw:details});}catch{}
         const msg='HTTP '+response.status+(details?': '+details:'');
         const error=new Error(msg);
         // 400 often means constrained format is unsupported; retry using JSON.
@@ -70,6 +71,8 @@ async function ollamaJSON(messages,{model,fetchImpl=fetch,timeoutMs=REVIEW_TIMEO
       }
       const json=await response.json();
       const raw=json?.message?.content;
+      try{onTrace({type:'response',attempt:attempt+1,status:response.status,
+        raw:typeof raw==='string'?raw.slice(0,12000):String(raw)});}catch{}
       try{
         return parseJSONObject(raw);
       }catch(error){
@@ -114,7 +117,7 @@ export async function reviewDialogue(context,answer,opts={}){
 }
 
 export async function rewriteDialogue(context,previous,review,{
-  model,fetchImpl=fetch,timeoutMs=30000
+  model,fetchImpl=fetch,timeoutMs=30000,onTrace=()=>{}
 }={}){
   const base=makeOllamaRequest(context,model,true);
   // Keep exact same NPC facts. User question remains last, with guidance in system.
@@ -136,6 +139,8 @@ export async function rewriteDialogue(context,previous,review,{
     }),{priority:'background',signal:controller.signal});
     if(!response.ok)throw Error('HTTP '+response.status);
     const data=await response.json();
+    try{onTrace({type:'response',status:response.status,
+      raw:String(data?.message?.content??'').slice(0,12000)});}catch{}
     return extractNPCReply([{generated_text:data?.message?.content}],context.question);
   }finally{clearTimeout(timeout);}
 }
@@ -154,7 +159,7 @@ export function sanitizeReflection(value){
   };
 }
 
-export async function reflectOnConversation(context,answer,{model,fetchImpl=fetch,timeoutMs=REVIEW_TIMEOUT_MS}={}){
+export async function reflectOnConversation(context,answer,{model,fetchImpl=fetch,timeoutMs=REVIEW_TIMEOUT_MS,onTrace=()=>{}}={}){
   const data=await ollamaJSON([
     {role:'system',content:
       'Você é um motor de estado SOCIAL FICTÍCIO para personagens de RPG. '+
@@ -173,6 +178,6 @@ export async function reflectOnConversation(context,answer,{model,fetchImpl=fetc
       currentFeeling:context.social?.feeling,playerSaid:bound(context.question,240),
       npcReplied:bound(answer,450)
     })}
-  ],{model,fetchImpl,timeoutMs,schema:REFLECTION_SCHEMA});
+  ],{model,fetchImpl,timeoutMs,schema:REFLECTION_SCHEMA,onTrace});
   return sanitizeReflection(data);
 }
