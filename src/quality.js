@@ -4,7 +4,7 @@
  */
 const norm=value=>String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 const unsupported=/\b(armadura|armaduras|espada|espadas|arma|armas|escudo|escudos)\b/i;
-const availability=/\b(temos?|possui|possuo|vendemos?|vendo|vendem|disponiveis?|encontr[a-z]*|comprar|oferecemos?)\b/i;
+const availability=/\b(tem|temos|possui|possuo|vendemos|vende|vendo|vendem|disponivel|disponiveis|encontr[a-z]*|comprar|oferecemos)\b/i;
 const negative=/\b(nao|nunca|sem|nenhum[ao]s?|indisponiveis?|esgotad[ao]s?)\b/i;
 
 export function objectiveDialogueIssues(context={},answer=''){
