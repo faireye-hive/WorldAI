@@ -56,6 +56,8 @@ export class SocialMemory {
     s.trust=clamp(s.trust+changeTrust,0,100);
     s.openness=clamp(s.openness+changeOpen,0,100);
     s.patience=clamp(s.patience+changePatience,0,100);
+    const actor=this.world.actors.get(id);
+    if(actor)actor.relationship=clamp((s.trust-50)*2,-100,100);
     s.feeling=feeling.has(payload.feeling)?payload.feeling:'neutro';
     s.opinion=opinion;s.insight=insight;s.revision++;
     s.history.push({
