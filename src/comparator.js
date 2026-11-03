@@ -7,7 +7,7 @@ const fmt = (value, unit='') => value === null || value === undefined || !Number
   ? '—' : Number(value).toLocaleString('pt-BR',{maximumFractionDigits:1}) + unit;
 const HISTORY_MAX = 20;
 
-export function initComparator(world) {
+export function initComparator(world,{onCompared=()=>{}}={}) {
   const root = byId('compare-panel');
   if (!root) return;
   const modelA=byId('cmp-model-a'),modelB=byId('cmp-model-b'),character=byId('cmp-character');
@@ -126,6 +126,7 @@ export function initComparator(world) {
   function vote(which){
     if(!currentRecord||!currentRecord.results[which==='a'?0:1])return;
     currentRecord.winner=currentRecord.results[which==='a'?0:1].model;
+    onCompared({...currentRecord,kind:'vote'});
     tell('Você escolheu '+currentRecord.winner+' como melhor resposta deste teste (avaliação manual).');
     voteA.classList.toggle('picked',which==='a');
     voteB.classList.toggle('picked',which==='b');
@@ -160,6 +161,7 @@ export function initComparator(world) {
         }
       });
       histories.unshift(record);histories.splice(HISTORY_MAX);
+      onCompared({...record,kind:'completed'});
       const errors=record.results.filter(r=>r.status==='error').length;
       const echoes=record.results.filter(r=>r.echoed).length;
       tell('Comparação concluída.'+(errors?' '+errors+' erro(s).':'')+(echoes?' '+echoes+' eco(s) detectado(s).':'')+
