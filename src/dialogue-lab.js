@@ -175,9 +175,12 @@ export function sanitizeReflection(value,context=null){
     const lower=opinion.toLocaleLowerCase('pt-BR');
     const focusesNpc=name.length>1&&(lower.startsWith(name+' ')||lower.startsWith('o '+name+' ')||lower.startsWith('a '+name+' '));
     const focusedAnimal=context.species!=='human' && /^(o lobo|a corca|o cervo|o javali)\b/i.test(lower);
+    // The LFM3 confused "Lina" with "Linda"; only descriptions whose
+    // grammatical subject is explicitly the PLAYER are kept as opinions.
+    const focusesPlayer=/^(o visitante|a visitante|o jogador|a jogadora|o viajante|a viajante|a pessoa|este visitante|essa pessoa)\b/i.test(lower);
     const original=bound(context.question,125);
     const playerEvidence=original?'O visitante disse: "'+original+'".':'O visitante conversou com este NPC.';
-    if(focusesNpc||focusedAnimal){
+    if(focusesNpc||focusedAnimal||!focusesPlayer){
       // Small models often describe what the NPC said or did, instead of
       // what the NPC thinks of the PLAYER. Do not persist that confusion.
       opinion=bound(playerEvidence,180);
