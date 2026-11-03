@@ -19,6 +19,7 @@ export function initNPCEditor(world,rpg,{onChanged=()=>{},onAdded=()=>{},onActio
  const field={name:$('npc-name'),title:$('npc-title'),role:$('npc-role'),
   species:$('npc-species'),biography:$('npc-personality'),
   description:$('npc-background'),gold:$('npc-gold'),emoji:$('npc-emoji')};
+ const speaking=$('npc-can-speak');
  const stockBox=$('npc-stock-grid'),bag=$('npc-player-bag');
  const active=$('npc-actions-grid');
  const place=$('npc-place'),item=$('npc-item'),qty=$('npc-qty');
@@ -26,6 +27,7 @@ export function initNPCEditor(world,rpg,{onChanged=()=>{},onAdded=()=>{},onActio
  let creating=false;
  for(const [id,label] of ROLES)option(field.role,id,label);
  for(const [id,label] of TYPES)option(field.species,id,label);
+ field.species.addEventListener('change',()=>{speaking.checked=field.species.value==='human';});
  for(const p of PLACES)option(place,p.id,p.name);
  for(const i of ITEMS)option(item,i.id,i.name+' · '+i.price+' moedas');
  for(const [id,label] of ACTIONS){
@@ -49,6 +51,7 @@ export function initNPCEditor(world,rpg,{onChanged=()=>{},onAdded=()=>{},onActio
   creating=false;$('npc-edit-save').textContent='Salvar NPC';$('npc-edit-new').textContent='+ Criar novo NPC';
   select.value=id;
   for(const k of Object.keys(field))field[k].value=cfg[k]??'';
+  speaking.checked=cfg.canSpeak;
   for(const [id,input] of actions)input.checked=cfg.actions.includes(id);
   for(const [id,input] of stocks)input.value=cfg.stock[id]??0;
   setMsg('Editando '+a.name+'. As alterações entram no prompt da IA e são salvas no navegador.');
@@ -60,6 +63,7 @@ export function initNPCEditor(world,rpg,{onChanged=()=>{},onAdded=()=>{},onActio
   field.biography.value='Curioso e prestativo';
   field.description.value='Vive na Vila Aurora e conhece seus moradores.';
   field.gold.value=60;field.emoji.value='🧑';
+  speaking.checked=true;
   for(const [key,input] of actions)input.checked=key==='guide';
   for(const input of stocks.values())input.value=0;
   $('npc-edit-save').textContent='Adicionar ao mundo';
@@ -80,6 +84,7 @@ export function initNPCEditor(world,rpg,{onChanged=()=>{},onAdded=()=>{},onActio
    stock[id]=value;
   }
   return {
+   canSpeak:speaking.checked,
    name:field.name.value.trim(),title:field.title.value.trim(),
    role:field.role.value,species:field.species.value,
    biography:field.biography.value.trim(),description:field.description.value.trim(),
