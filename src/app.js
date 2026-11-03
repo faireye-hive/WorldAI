@@ -53,8 +53,19 @@ world.onEvent=e=>{if(e.type==='decision')state.decisions++;};
 function renderActors(){const list=$('actor-list');list.replaceChildren();$('actors-count').textContent=all.length;$('world-agents').textContent=all.length;for(const a of all){const b=document.createElement('button');b.className='actor-item'+(a.id===world.selectedId?' selected':'');b.type='button';b.dataset.actorId=a.id;b.innerHTML=`<span class="avatar"></span><span class="copy"><strong></strong><small></small></span><span class="status">●</span>`;b.querySelector('.avatar').textContent=a.emoji;b.querySelector('strong').textContent=a.name;b.querySelector('small').textContent=a.role==='wolf'||a.role==='deer'||a.role==='boar'?'Criatura do bosque':a.role.toUpperCase();b.addEventListener('click',()=>selectActor(a.id));list.appendChild(b);}}
 function makeMessage(type,from,text){const article=document.createElement('div');article.className='message '+type;const by=document.createElement('small');by.textContent=from;const content=document.createElement('div');content.textContent=text;article.append(by,content);return article;}
 function appendMessage(type,from,text){const area=$('speech-log');const el=makeMessage(type,from,text);area.appendChild(el);area.scrollTop=area.scrollHeight;return el;}
+const introLogged=new Set();
 function renderConversation(){const a=world.selected;if(!a)return;$('character-name').textContent=a.name;$('character-class').textContent=a.role==='wolf'||a.role==='deer'||a.role==='boar'?'FAUNA LOCAL':a.role.toUpperCase();$('character-mood').textContent='✦ '+a.biography;$('portrait-figure').textContent=a.emoji;$('portrait-area').style.background=`radial-gradient(ellipse at 50% 115%,${emojiColors[a.role]}66,transparent 70%),linear-gradient(120deg,#242a4b,#32304d)`;
- const area=$('speech-log');area.replaceChildren();if(a.history.length===0){appendMessage('npc',a.name,a.species==='human'?'Ah, um novo visitante! Fale comigo para conhecer minha história.':'A criatura olha em sua direção, observando seus movimentos.');}else{for(const item of a.history)appendMessage(item.role==='user'?'user':'npc',item.role==='user'?'VOCÊ':a.name,item.content);}
+ const area=$('speech-log');area.replaceChildren();if(a.history.length===0){
+   const intro=a.species==='human'
+    ?'Ah, um novo visitante! Fale comigo para conhecer minha história.'
+    :'A criatura olha em sua direção, observando seus movimentos.';
+   appendMessage('npc',a.name,intro);
+   if(!introLogged.has(a.id)){
+     logEvent({type:'npc_message',actorId:a.id,actorName:a.name,
+       model:'offline',mode:'intro',text:intro});
+     introLogged.add(a.id);
+   }
+ }else{for(const item of a.history)appendMessage(item.role==='user'?'user':'npc',item.role==='user'?'VOCÊ':a.name,item.content);}
  $('story-counter').textContent='MEMÓRIA: '+a.memories.length;$('suggestions').replaceChildren();for(const h of hints){const btn=document.createElement('button');btn.type='button';btn.textContent=h;btn.disabled=state.busy;btn.addEventListener('click',()=>sendMessage(h));$('suggestions').appendChild(btn);} $('chat-input').placeholder=`Conversar com ${a.name}...`;}
 let editor=null,cognition=null;
 function selectActor(id){world.select(id);state.lastSelected=id;renderActors();renderConversation();editor?.refresh();cognition?.render(id);save();}
@@ -191,7 +202,12 @@ renderActors();renderConversation();
 editor=initNPCEditor(world,rpg,{
  onChanged:()=>{renderActors();renderConversation();save();},
  onAdded:a=>{all.push(a);renderActors();renderConversation();save();},
- onAction:outcome=>{if(outcome.ok)save();}
+ onAction:(outcome,proposal)=>{
+  logEvent({type:'action',actorId:proposal?.actorId,actorName:world.actors.get(proposal?.actorId)?.name||'NPC',
+    mode:'manual',model:'rules',text:outcome.message,
+    details:{proposal,success:outcome.ok,goldAfter:rpg.gold,bagAfter:{...rpg.bag}}});
+  if(outcome.ok)save();
+}
 });
 initComparator(world,{onCompared:record=>logEvent({
   type:'compare',model:record.models?.join(' vs '),actorId:record.characterId,
